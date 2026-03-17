@@ -1,6 +1,6 @@
 services:
   rockbox-web:
-    build: .
+    image: ghcr.io/v3rm0n/rockbox-web:latest
     container_name: rockbox-web
     ports:
       - "3000:3000"

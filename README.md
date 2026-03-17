@@ -1,5 +1,9 @@
 # Rockbox Web Manager
 
+[![Build](https://github.com/v3rm0n/rockbox-web/actions/workflows/build.yml/badge.svg)](https://github.com/v3rm0n/rockbox-web/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docker Image](https://img.shields.io/badge/ghcr.io-v3rm0n%2Frockbox--web-blue)](https://github.com/v3rm0n/rockbox-web/pkgs/container/rockbox-web)
+
 A web application for managing music on [Rockbox](https://www.rockbox.org/) media players. Runs as a Docker container on your NAS (Unraid, Synology, etc.), mounts your music library and player storage, and lets you browse, search, and sync music through a clean web interface.
 
 ## Features
@@ -25,12 +29,20 @@ NAS                              Docker Container                    Player
 
 The app expects a well-structured music library (e.g. managed by [Lidarr](https://lidarr.audio/)) and mirrors that structure on the player. File matching is done by relative path — if `/library/Artist/Album/01 - Song.flac` exists and the same path exists under the managed directory on the player, it's considered synced.
 
-## Quick start with Docker Compose
+## Quick start
+
+Pull the image from GitHub Container Registry:
+
+```sh
+docker pull ghcr.io/v3rm0n/rockbox-web:latest
+```
+
+### Docker Compose
 
 ```yaml
 services:
   rockbox-web:
-    build: .
+    image: ghcr.io/v3rm0n/rockbox-web:latest
     container_name: rockbox-web
     ports:
       - "3000:3000"
@@ -48,13 +60,24 @@ volumes:
 
 Replace `/path/to/your/music/library` with your NAS music share and `/path/to/your/player` with the mounted Rockbox player storage.
 
-Then run:
-
 ```sh
 docker compose up -d
 ```
 
 Open `http://your-nas-ip:3000` and follow the setup wizard.
+
+### Docker run
+
+```sh
+docker run -d \
+  --name rockbox-web \
+  -p 3000:3000 \
+  -v rockbox-data:/data \
+  -v /path/to/your/music/library:/library:ro \
+  -v /path/to/your/player:/player \
+  -e ORIGIN=http://localhost:3000 \
+  ghcr.io/v3rm0n/rockbox-web:latest
+```
 
 ## Environment variables
 
