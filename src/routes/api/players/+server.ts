@@ -26,7 +26,7 @@ export const GET: RequestHandler = async () => {
 
 	return json({
 		players,
-		discovered,
+		discoveredDevices: discovered,
 		activePlayer,
 		mountBase
 	});

@@ -63,6 +63,15 @@ function migrate(db: Database.Database): void {
 			scanned_at    TEXT NOT NULL DEFAULT (datetime('now'))
 		);
 
+		CREATE TABLE IF NOT EXISTS players (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			name         TEXT NOT NULL,
+			mount_path   TEXT NOT NULL,
+			managed_dir  TEXT NOT NULL DEFAULT '',
+			is_active    INTEGER NOT NULL DEFAULT 0,
+			created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+		);
+
 		CREATE TABLE IF NOT EXISTS player_tracks (
 			id               INTEGER PRIMARY KEY AUTOINCREMENT,
 			player_id        INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -84,15 +93,6 @@ function migrate(db: Database.Database): void {
 			finished_at TEXT,
 			error       TEXT,
 			player_id   INTEGER REFERENCES players(id) ON DELETE SET NULL
-		);
-
-		CREATE TABLE IF NOT EXISTS players (
-			id           INTEGER PRIMARY KEY AUTOINCREMENT,
-			name         TEXT NOT NULL,
-			mount_path   TEXT NOT NULL,
-			managed_dir  TEXT NOT NULL DEFAULT '',
-			is_active    INTEGER NOT NULL DEFAULT 0,
-			created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 		);
 
 		CREATE INDEX IF NOT EXISTS idx_library_tracks_artist ON library_tracks(artist);

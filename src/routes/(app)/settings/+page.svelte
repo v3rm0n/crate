@@ -43,12 +43,11 @@
 	interface DiscoveredDevice {
 		name: string;
 		path: string;
-		size: number;
 	}
 
 	interface PlayersData {
 		players: Player[];
-		mountBase: string | null;
+		mountBase: string;
 		discoveredDevices: DiscoveredDevice[];
 	}
 
@@ -68,7 +67,7 @@
 	let selectedDevice: DiscoveredDevice | null = $state(null);
 	let managedDirInput = $state('');
 	let playerNameInput = $state('');
-	let availableDirectories = $state<string[]>([]);
+	let availableDirectories = $state<{ name: string; path: string }[]>([]);
 	let loadingDirectories = $state(false);
 	let savingPlayer = $state(false);
 	let editingPlayer: Player | null = $state(null);
@@ -143,7 +142,7 @@
 		addPlayerStep = 3;
 
 		try {
-			const res = await fetch(`/api/players/0/directories`, {
+			const res = await fetch('/api/players/browse', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ path: device.path })
@@ -155,17 +154,17 @@
 		}
 	}
 
-	async function browseDirectories(path: string) {
+	async function browseDirectories(absolutePath: string, relativePath: string) {
 		loadingDirectories = true;
 		try {
-			const res = await fetch(`/api/players/0/directories`, {
+			const res = await fetch('/api/players/browse', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ path })
+				body: JSON.stringify({ path: absolutePath })
 			});
 			const data = await res.json();
 			availableDirectories = data.directories || [];
-			managedDirInput = path;
+			managedDirInput = relativePath;
 		} finally {
 			loadingDirectories = false;
 		}
@@ -645,7 +644,6 @@
 								>
 									<span class="device-name">{device.name}</span>
 									<span class="device-path">{device.path}</span>
-									<span class="device-size">{formatBytes(device.size)}</span>
 								</button>
 							{/each}
 						</div>
@@ -675,24 +673,23 @@
 						{:else}
 							<div class="directory-list">
 								{#each availableDirectories as dir}
+									{@const relativePath = selectedDevice ? dir.path.slice(selectedDevice.path.length).replace(/^\//, '') : dir.name}
 									<button
 										class="directory-option"
-										onclick={() => browseDirectories(dir)}
+										onclick={() => browseDirectories(dir.path, relativePath)}
 									>
 										<span class="dir-icon">📁</span>
-										<span class="dir-name">{dir.split('/').pop()}</span>
-										<span class="dir-path">{dir}</span>
+										<span class="dir-name">{dir.name}</span>
+										<span class="dir-path">{relativePath}</span>
 									</button>
 								{/each}
 							</div>
 						{/if}
 					</div>
-					{#if managedDirInput}
-						<div class="selected-path">
-							<span class="path-label">Selected:</span>
-							<code>{managedDirInput}</code>
-						</div>
-					{/if}
+					<div class="selected-path">
+						<span class="path-label">Selected:</span>
+						<code>{managedDirInput || '/ (root of device)'}</code>
+					</div>
 				</div>
 				<div class="modal-actions">
 					<button class="btn-cancel" onclick={() => addPlayerStep = 2}>Back</button>
@@ -700,7 +697,6 @@
 					<button
 						class="btn-confirm"
 						onclick={confirmManagedDir}
-						disabled={!managedDirInput}
 					>
 						Next
 					</button>
