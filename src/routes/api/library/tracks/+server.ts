@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import db from '$lib/server/db.js';
+import { getActivePlayerId } from '$lib/server/players.js';
 import type { RequestHandler } from './$types.js';
 
 const ALLOWED_SORT_COLUMNS: Record<string, string> = {
@@ -25,6 +26,10 @@ export const GET: RequestHandler = async ({ url }) => {
 	const limit = parseInt(url.searchParams.get('limit') || '100');
 	const offset = (page - 1) * limit;
 
+	// Get player ID from query param or fallback to active player
+	const playerIdParam = url.searchParams.get('player_id');
+	const playerId = playerIdParam ? parseInt(playerIdParam, 10) : getActivePlayerId();
+
 	let whereClause = 'WHERE 1=1';
 	const params: (string | number)[] = [];
 
@@ -45,7 +50,15 @@ export const GET: RequestHandler = async ({ url }) => {
 	}
 
 	// Sync filter requires a HAVING or sub-select since is_synced is computed
+	// Filter by specific player ID if provided
 	let syncCondition = '';
+	let playerJoin = 'LEFT JOIN player_tracks pt ON pt.library_track_id = lt.id';
+	
+	if (playerId) {
+		playerJoin = 'LEFT JOIN player_tracks pt ON pt.library_track_id = lt.id AND pt.player_id = ?';
+		params.unshift(playerId); // Add playerId to the beginning for the JOIN
+	}
+	
 	if (syncFilter === 'synced') {
 		syncCondition = ' AND pt.id IS NOT NULL';
 	} else if (syncFilter === 'unsynced') {
@@ -57,7 +70,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	const countQuery = `
 		SELECT COUNT(*) as total
 		FROM library_tracks lt
-		LEFT JOIN player_tracks pt ON pt.library_track_id = lt.id
+		${playerJoin}
 		${fullWhere}
 	`;
 	const total = (db.prepare(countQuery).get(...params) as { total: number }).total;
@@ -82,12 +95,12 @@ export const GET: RequestHandler = async ({ url }) => {
 			CASE WHEN pt.id IS NOT NULL THEN 1 ELSE 0 END as is_synced,
 			pt.id as player_track_id
 		FROM library_tracks lt
-		LEFT JOIN player_tracks pt ON pt.library_track_id = lt.id
+		${playerJoin}
 		${fullWhere}
 		ORDER BY ${orderClause}
 		LIMIT ? OFFSET ?
 	`;
 
 	const tracks = db.prepare(query).all(...params, limit, offset);
-	return json({ tracks, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+	return json({ tracks, playerId, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 };

@@ -1,16 +1,27 @@
 import { scanPlayer } from '$lib/server/player.js';
+import { getActivePlayerId } from '$lib/server/players.js';
 import { createLogger } from '$lib/server/logger.js';
 import type { RequestHandler } from './$types.js';
 
 const log = createLogger('api:scan:player');
 
-export const GET: RequestHandler = async () => {
-	log.info('Player scan requested via API');
+export const GET: RequestHandler = async ({ url }) => {
+	const playerIdParam = url.searchParams.get('player_id');
+	const playerId = playerIdParam ? parseInt(playerIdParam, 10) : getActivePlayerId();
+
+	if (!playerId) {
+		return new Response(JSON.stringify({ error: 'No player specified and no active player' }), {
+			status: 400,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
+
+	log.info('Player scan requested via API', { playerId });
 
 	const stream = new ReadableStream({
 		start(controller) {
 			const encoder = new TextEncoder();
-			scanPlayer((progress) => {
+			scanPlayer(playerId, (progress) => {
 				const data = `data: ${JSON.stringify(progress)}\n\n`;
 				try {
 					controller.enqueue(encoder.encode(data));

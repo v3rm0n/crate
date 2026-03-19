@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
-import { setSetting, getPlayerPath } from '$lib/server/settings.js';
+import { setSetting } from '$lib/server/settings.js';
+import { createPlayer, getPlayerManagedPath } from '$lib/server/players.js';
 import { planMigration, executeMigration } from '$lib/server/migrate.js';
 import { scanLibrary } from '$lib/server/scanner.js';
 import { scanPlayer } from '$lib/server/player.js';
@@ -11,25 +12,38 @@ import type { RequestHandler } from './$types.js';
 const log = createLogger('setup');
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { managedDir } = await request.json();
-	log.info('Setup initialization started', { managedDir });
+	const { name, mountPath, managedDir } = await request.json();
+	log.info('Setup initialization started', { name, mountPath, managedDir });
 
-	if (!managedDir) {
-		log.error('Setup failed: managed directory not provided');
-		return json({ error: 'Managed directory is required' }, { status: 400 });
+	if (!name || !mountPath) {
+		log.error('Setup failed: missing required fields');
+		return json({ error: 'Name and mount path are required' }, { status: 400 });
 	}
 
-	const fullPath = path.join(getPlayerPath(), managedDir);
-
-	if (!fs.existsSync(fullPath)) {
-		log.info('Creating managed directory', { fullPath });
-		fs.mkdirSync(fullPath, { recursive: true });
+	if (!fs.existsSync(mountPath)) {
+		log.error('Setup failed: mount path does not exist', { mountPath });
+		return json({ error: 'Mount path does not exist' }, { status: 400 });
 	}
 
-	setSetting('managed_dir', managedDir);
+	// Create the player
+	const player = createPlayer(name, mountPath, managedDir || '');
+	const playerId = player.id;
+	log.info('Player created', { playerId, name, mountPath, managedDir });
 
-	log.info('Planning migration', { fullPath });
-	const plan = await planMigration(fullPath);
+	const managedPath = getPlayerManagedPath(playerId);
+	if (!managedPath) {
+		log.error('Setup failed: could not get managed path');
+		return json({ error: 'Failed to get managed path' }, { status: 500 });
+	}
+
+	// Create managed directory if it doesn't exist
+	if (!fs.existsSync(managedPath)) {
+		log.info('Creating managed directory', { managedPath });
+		fs.mkdirSync(managedPath, { recursive: true });
+	}
+
+	log.info('Planning migration', { managedPath });
+	const plan = await planMigration(managedPath);
 	log.info('Migration plan created', {
 		moves: plan.moves.length,
 		unsorted: plan.unsorted.length,
@@ -39,7 +53,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	let migrationResult = null;
 	if (plan.moves.length > 0 || plan.unsorted.length > 0) {
 		log.info('Executing migration');
-		migrationResult = await executeMigration(fullPath, plan);
+		migrationResult = await executeMigration(managedPath, plan);
 		log.info('Migration completed', {
 			moved: migrationResult.moved,
 			unsorted: migrationResult.unsorted,
@@ -52,14 +66,15 @@ export const POST: RequestHandler = async ({ request }) => {
 	log.info('Running initial library scan');
 	await scanLibrary();
 
-	log.info('Running initial player scan');
-	await scanPlayer();
+	log.info('Running initial player scan', { playerId });
+	await scanPlayer(playerId);
 
 	setSetting('setup_completed', 'true');
 	log.info('Setup completed successfully');
 
 	return json({
 		success: true,
+		player,
 		migration: migrationResult
 			? {
 					moved: migrationResult.moved,

@@ -41,7 +41,7 @@
 	}
 
 	function parseId() {
-		const id = decodeURIComponent(page.params.id);
+		const id = decodeURIComponent(page.params.id ?? '');
 		const sepIndex = id.indexOf(':');
 		if (sepIndex === -1) return { artist: '', album: id };
 		return { artist: id.slice(0, sepIndex), album: id.slice(sepIndex + 1) };

@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import db from '$lib/server/db.js';
+import { getActivePlayerId } from '$lib/server/players.js';
 import type { RequestHandler } from './$types.js';
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -7,9 +8,17 @@ export const GET: RequestHandler = async ({ url }) => {
 	const limit = parseInt(url.searchParams.get('limit') || '100');
 	const offset = (page - 1) * limit;
 	const search = url.searchParams.get('q');
+	const playerIdParam = url.searchParams.get('player_id');
 
-	let whereClause = 'WHERE 1=1';
-	const params: (string | number)[] = [];
+	// Get player ID from query param or fallback to active player
+	const playerId = playerIdParam ? parseInt(playerIdParam, 10) : getActivePlayerId();
+
+	if (!playerId) {
+		return json({ error: 'No player specified and no active player' }, { status: 400 });
+	}
+
+	let whereClause = 'WHERE pt.player_id = ?';
+	const params: (string | number)[] = [playerId];
 
 	if (search) {
 		whereClause += ' AND (pt.relative_path LIKE ? OR lt.title LIKE ? OR lt.artist LIKE ? OR lt.album LIKE ?)';
@@ -35,5 +44,5 @@ export const GET: RequestHandler = async ({ url }) => {
 	`;
 
 	const tracks = db.prepare(query).all(...params, limit, offset);
-	return json({ tracks, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+	return json({ tracks, playerId, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 };

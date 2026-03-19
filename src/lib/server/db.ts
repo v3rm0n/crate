@@ -65,11 +65,13 @@ function migrate(db: Database.Database): void {
 
 		CREATE TABLE IF NOT EXISTS player_tracks (
 			id               INTEGER PRIMARY KEY AUTOINCREMENT,
-			relative_path    TEXT NOT NULL UNIQUE,
+			player_id        INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+			relative_path    TEXT NOT NULL,
 			library_track_id INTEGER REFERENCES library_tracks(id) ON DELETE SET NULL,
 			file_size        INTEGER,
 			is_orphan        INTEGER NOT NULL DEFAULT 0,
-			synced_at        TEXT NOT NULL DEFAULT (datetime('now'))
+			synced_at        TEXT NOT NULL DEFAULT (datetime('now')),
+			UNIQUE(player_id, relative_path)
 		);
 
 		CREATE TABLE IF NOT EXISTS jobs (
@@ -80,15 +82,94 @@ function migrate(db: Database.Database): void {
 			total       INTEGER NOT NULL DEFAULT 0,
 			started_at  TEXT NOT NULL DEFAULT (datetime('now')),
 			finished_at TEXT,
-			error       TEXT
+			error       TEXT,
+			player_id   INTEGER REFERENCES players(id) ON DELETE SET NULL
+		);
+
+		CREATE TABLE IF NOT EXISTS players (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			name         TEXT NOT NULL,
+			mount_path   TEXT NOT NULL,
+			managed_dir  TEXT NOT NULL DEFAULT '',
+			is_active    INTEGER NOT NULL DEFAULT 0,
+			created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 		);
 
 		CREATE INDEX IF NOT EXISTS idx_library_tracks_artist ON library_tracks(artist);
 		CREATE INDEX IF NOT EXISTS idx_library_tracks_album ON library_tracks(album);
 		CREATE INDEX IF NOT EXISTS idx_library_tracks_album_artist ON library_tracks(album_artist);
 		CREATE INDEX IF NOT EXISTS idx_library_tracks_genre ON library_tracks(genre);
+		CREATE INDEX IF NOT EXISTS idx_player_tracks_player_id ON player_tracks(player_id);
 		CREATE INDEX IF NOT EXISTS idx_player_tracks_library_track_id ON player_tracks(library_track_id);
+		CREATE INDEX IF NOT EXISTS idx_jobs_player_id ON jobs(player_id);
+		CREATE INDEX IF NOT EXISTS idx_players_is_active ON players(is_active);
 	`);
+
+	// Run data migrations
+	migrateData(db);
+}
+
+function migrateData(db: Database.Database): void {
+	// Check if we need to migrate from single-player to multi-player schema
+	const hasPlayerIdColumn = db.prepare(`
+		SELECT 1 FROM pragma_table_info('player_tracks') WHERE name = 'player_id'
+	`).get();
+
+	if (!hasPlayerIdColumn) {
+		log.info('Migrating from single-player to multi-player schema');
+
+		// Create temporary table with new schema
+		db.exec(`
+			CREATE TABLE player_tracks_new (
+				id               INTEGER PRIMARY KEY AUTOINCREMENT,
+				player_id        INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+				relative_path    TEXT NOT NULL,
+				library_track_id INTEGER REFERENCES library_tracks(id) ON DELETE SET NULL,
+				file_size        INTEGER,
+				is_orphan        INTEGER NOT NULL DEFAULT 0,
+				synced_at        TEXT NOT NULL DEFAULT (datetime('now')),
+				UNIQUE(player_id, relative_path)
+			);
+
+			CREATE INDEX idx_player_tracks_player_id_new ON player_tracks_new(player_id);
+			CREATE INDEX idx_player_tracks_library_track_id_new ON player_tracks_new(library_track_id);
+		`);
+
+		// Check if we have existing player tracks to migrate
+		const existingTracks = db.prepare('SELECT COUNT(*) as count FROM player_tracks').get() as { count: number };
+
+		if (existingTracks.count > 0) {
+			// Get the legacy settings to create a default player
+			const managedDir = db.prepare("SELECT value FROM settings WHERE key = 'managed_dir'").get() as { value: string } | undefined;
+			const playerPath = process.env.PLAYER_PATH || '/player';
+
+			// Create default player from legacy settings
+			const result = db.prepare(`
+				INSERT INTO players (name, mount_path, managed_dir, is_active)
+				VALUES (?, ?, ?, 1)
+			`).run('Default Player', playerPath, managedDir?.value || '');
+
+			const defaultPlayerId = result.lastInsertRowid;
+			log.info('Created default player from legacy settings', { playerId: defaultPlayerId, mountPath: playerPath, managedDir: managedDir?.value });
+
+			// Migrate existing tracks to use the default player
+			db.prepare(`
+				INSERT INTO player_tracks_new (player_id, relative_path, library_track_id, file_size, is_orphan, synced_at)
+				SELECT ?, relative_path, library_track_id, file_size, is_orphan, synced_at
+				FROM player_tracks
+			`).run(defaultPlayerId);
+
+			log.info('Migrated existing tracks to default player', { count: existingTracks.count });
+		}
+
+		// Replace old table with new one
+		db.exec(`
+			DROP TABLE player_tracks;
+			ALTER TABLE player_tracks_new RENAME TO player_tracks;
+		`);
+
+		log.info('Migration to multi-player schema completed');
+	}
 }
 
 // Proxy that lazily initializes the database on first access

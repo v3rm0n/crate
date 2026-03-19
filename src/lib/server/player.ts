@@ -1,5 +1,5 @@
 import db from './db.js';
-import { getManagedDir, getPlayerPath } from './settings.js';
+import { getPlayerManagedPath, getPlayer, type Player } from './players.js';
 import { isSupportedAudioFile } from './metadata.js';
 import { createLogger } from './logger.js';
 import fs from 'node:fs';
@@ -9,16 +9,6 @@ import type { ScanProgress } from './scanner.js';
 const log = createLogger('player');
 
 type ProgressCallback = (progress: ScanProgress) => void;
-
-/**
- * Get the full path to the managed directory on the player.
- */
-export function getPlayerManagedPath(): string | null {
-	const playerPath = getPlayerPath();
-	const managedDir = getManagedDir();
-	if (!managedDir) return null;
-	return path.join(playerPath, managedDir);
-}
 
 /**
  * Recursively walk a directory and return all file paths.
@@ -42,39 +32,29 @@ function walkDir(dir: string): string[] {
 }
 
 /**
- * List top-level directories in the player mount.
- * Used by the setup wizard to let the user pick the managed directory.
+ * Scan a player's managed directory and cross-reference with library.
  */
-export function listPlayerDirectories(subPath?: string): { name: string; path: string; isDir: boolean }[] {
-	const playerPath = getPlayerPath();
-	const targetPath = subPath ? path.join(playerPath, subPath) : playerPath;
-
-	if (!fs.existsSync(targetPath)) return [];
-
-	try {
-		const entries = fs.readdirSync(targetPath, { withFileTypes: true });
-		return entries
-			.filter((e) => e.isDirectory())
-			.map((e) => ({
-				name: e.name,
-				path: subPath ? path.join(subPath, e.name) : e.name,
-				isDir: true
-			}))
-			.sort((a, b) => a.name.localeCompare(b.name));
-	} catch {
-		return [];
+export async function scanPlayer(
+	playerId: number,
+	onProgress?: ProgressCallback
+): Promise<void> {
+	const player = getPlayer(playerId);
+	if (!player) {
+		log.error('Player not found', { playerId });
+		onProgress?.({
+			phase: 'error',
+			current: 0,
+			total: 0,
+			error: 'Player not found'
+		});
+		return;
 	}
-}
 
-/**
- * Scan the player's managed directory and cross-reference with library.
- */
-export async function scanPlayer(onProgress?: ProgressCallback): Promise<void> {
-	const managedPath = getPlayerManagedPath();
-	log.info('Starting player scan', { managedPath });
+	const managedPath = getPlayerManagedPath(playerId);
+	log.info('Starting player scan', { playerId, managedPath });
 
 	if (!managedPath) {
-		log.error('Managed directory not configured');
+		log.error('Managed directory not configured', { playerId });
 		onProgress?.({
 			phase: 'error',
 			current: 0,
@@ -85,7 +65,7 @@ export async function scanPlayer(onProgress?: ProgressCallback): Promise<void> {
 	}
 
 	if (!fs.existsSync(managedPath)) {
-		log.error('Managed directory does not exist on player', { managedPath });
+		log.error('Managed directory does not exist on player', { playerId, managedPath });
 		onProgress?.({
 			phase: 'error',
 			current: 0,
@@ -96,33 +76,33 @@ export async function scanPlayer(onProgress?: ProgressCallback): Promise<void> {
 	}
 
 	const job = db
-		.prepare("INSERT INTO jobs (type, status) VALUES ('player_scan', 'running')")
-		.run();
+		.prepare("INSERT INTO jobs (type, status, player_id) VALUES ('player_scan', 'running', ?)")
+		.run(playerId);
 	const jobId = job.lastInsertRowid;
-	log.info('Created player scan job', { jobId });
+	log.info('Created player scan job', { jobId, playerId });
 
 	try {
 		onProgress?.({ phase: 'discovering', current: 0, total: 0 });
 		const files = walkDir(managedPath);
 		const total = files.length;
 
-		log.info('Player file discovery complete', { totalFiles: total, managedPath });
+		log.info('Player file discovery complete', { playerId, totalFiles: total, managedPath });
 		if (total === 0) {
-			log.warn('No audio files found on player', { managedPath });
+			log.warn('No audio files found on player', { playerId, managedPath });
 		}
 
 		db.prepare('UPDATE jobs SET total = ? WHERE id = ?').run(total, jobId);
 		onProgress?.({ phase: 'scanning', current: 0, total });
 
-		// Clear existing player tracks and re-index
-		db.prepare('DELETE FROM player_tracks').run();
+		// Clear existing player tracks for this player and re-index
+		db.prepare('DELETE FROM player_tracks WHERE player_id = ?').run(playerId);
 
 		const findLibraryTrack = db.prepare(
 			'SELECT id FROM library_tracks WHERE relative_path = ?'
 		);
 		const insertStmt = db.prepare(`
-			INSERT INTO player_tracks (relative_path, library_track_id, file_size, is_orphan, synced_at)
-			VALUES (?, ?, ?, ?, datetime('now'))
+			INSERT INTO player_tracks (player_id, relative_path, library_track_id, file_size, is_orphan, synced_at)
+			VALUES (?, ?, ?, ?, ?, datetime('now'))
 		`);
 
 		for (let i = 0; i < files.length; i++) {
@@ -134,6 +114,7 @@ export async function scanPlayer(onProgress?: ProgressCallback): Promise<void> {
 			const libraryTrack = findLibraryTrack.get(relativePath) as { id: number } | undefined;
 
 			insertStmt.run(
+				playerId,
 				relativePath,
 				libraryTrack?.id || null,
 				stat.size,
@@ -150,13 +131,13 @@ export async function scanPlayer(onProgress?: ProgressCallback): Promise<void> {
 			"UPDATE jobs SET status = 'completed', progress = total, finished_at = datetime('now') WHERE id = ?"
 		).run(jobId);
 
-		const orphanCount = (db.prepare('SELECT COUNT(*) as count FROM player_tracks WHERE is_orphan = 1').get() as { count: number }).count;
-		const totalTracks = (db.prepare('SELECT COUNT(*) as count FROM player_tracks').get() as { count: number }).count;
-		log.info('Player scan completed', { jobId, totalFiles: total, tracksInDb: totalTracks, orphans: orphanCount });
+		const orphanCount = (db.prepare('SELECT COUNT(*) as count FROM player_tracks WHERE player_id = ? AND is_orphan = 1').get(playerId) as { count: number }).count;
+		const totalTracks = (db.prepare('SELECT COUNT(*) as count FROM player_tracks WHERE player_id = ?').get(playerId) as { count: number }).count;
+		log.info('Player scan completed', { jobId, playerId, totalFiles: total, tracksInDb: totalTracks, orphans: orphanCount });
 		onProgress?.({ phase: 'complete', current: total, total });
 	} catch (err) {
 		const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-		log.error('Player scan failed', { jobId, error: errorMsg });
+		log.error('Player scan failed', { jobId, playerId, error: errorMsg });
 		db.prepare(
 			"UPDATE jobs SET status = 'failed', error = ?, finished_at = datetime('now') WHERE id = ?"
 		).run(errorMsg, jobId);
@@ -165,37 +146,36 @@ export async function scanPlayer(onProgress?: ProgressCallback): Promise<void> {
 }
 
 /**
- * Get storage information for the player mount.
+ * Get storage information for a specific player.
  */
-export function getPlayerStorage(): {
+export function getPlayerStorage(playerId: number): {
 	total: number;
 	used: number;
 	free: number;
 	managedSize: number;
 } {
-	const playerPath = getPlayerPath();
+	const player = getPlayer(playerId);
+	if (!player) {
+		log.error('Player not found for storage info', { playerId });
+		return { total: 0, used: 0, free: 0, managedSize: 0 };
+	}
 
 	try {
-		const stats = fs.statfsSync(playerPath);
+		const stats = fs.statfsSync(player.mount_path);
 		const blockSize = stats.bsize;
 		const total = stats.blocks * blockSize;
 		const free = stats.bavail * blockSize;
 		const used = total - free;
 
-		// Calculate size of managed directory
-		const managedPath = getPlayerManagedPath();
-		let managedSize = 0;
-		if (managedPath && fs.existsSync(managedPath)) {
-			const playerTracks = db
-				.prepare('SELECT COALESCE(SUM(file_size), 0) as total FROM player_tracks')
-				.get() as { total: number };
-			managedSize = playerTracks.total;
-		}
+		// Calculate size of managed directory for this player
+		const managedSize = (db.prepare(
+			'SELECT COALESCE(SUM(file_size), 0) as total FROM player_tracks WHERE player_id = ?'
+		).get(playerId) as { total: number }).total;
 
-		log.debug('Player storage info', { playerPath, total, used, free, managedSize });
+		log.debug('Player storage info', { playerId, mountPath: player.mount_path, total, used, free, managedSize });
 		return { total, used, free, managedSize };
 	} catch (err) {
-		log.error('Failed to get player storage info', { playerPath, error: err instanceof Error ? err.message : String(err) });
+		log.error('Failed to get player storage info', { playerId, mountPath: player.mount_path, error: err instanceof Error ? err.message : String(err) });
 		return { total: 0, used: 0, free: 0, managedSize: 0 };
 	}
 }

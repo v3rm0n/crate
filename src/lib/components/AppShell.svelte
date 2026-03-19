@@ -1,7 +1,24 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
+	import PlayerSelector from './PlayerSelector.svelte';
 
-	let { children } = $props();
+	interface Player {
+		id: number;
+		name: string;
+		mount_path: string;
+		managed_dir: string;
+		is_active: number;
+		track_count: number;
+		total_size: number;
+	}
+
+	let { children, players = [], activePlayer = null, onPlayerSelect }: {
+		children: Snippet;
+		players?: Player[];
+		activePlayer?: Player | null;
+		onPlayerSelect?: (playerId: number) => void;
+	} = $props();
 
 	const navItems = [
 		{ href: '/library', label: 'Library', icon: 'library' },
@@ -12,6 +29,10 @@
 	function isActive(href: string): boolean {
 		return page.url.pathname.startsWith(href);
 	}
+
+	function handlePlayerSelect(playerId: number) {
+		onPlayerSelect?.(playerId);
+	}
 </script>
 
 <div class="app-shell">
@@ -21,6 +42,15 @@
 				<span class="logo-icon">◆</span>
 				Crate
 			</h1>
+			{#if players.length > 0}
+				<PlayerSelector
+					{players}
+					{activePlayer}
+					onSelect={handlePlayerSelect}
+					onAdd={() => window.location.href = '/settings?tab=players'}
+					onManage={() => window.location.href = '/settings?tab=players'}
+				/>
+			{/if}
 		</div>
 
 		<ul class="nav-list">

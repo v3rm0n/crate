@@ -1,6 +1,8 @@
+import db from './db.js';
 import { scanLibrary } from './scanner.js';
 import { scanPlayer } from './player.js';
 import { isSetupComplete } from './settings.js';
+import { getActivePlayer, getPlayers } from './players.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('cron');
@@ -24,7 +26,7 @@ function getIntervalMs(): number {
 }
 
 /**
- * Run a full scan cycle: library scan, then player scan.
+ * Run a full scan cycle: library scan, then scan all players.
  * Skips if a scan is already in progress or setup isn't complete.
  */
 async function runScanCycle(): Promise<void> {
@@ -43,11 +45,22 @@ async function runScanCycle(): Promise<void> {
 	log.info('Starting scheduled scan cycle');
 
 	try {
+		// Scan library first
 		await scanLibrary();
-		await scanPlayer();
+
+		// Get all players and scan each one
+		const players = getPlayers();
+		if (players.length === 0) {
+			log.info('No players configured, skipping player scans');
+		} else {
+			for (const player of players) {
+				log.info('Scanning player', { playerId: player.id, name: player.name });
+				await scanPlayer(player.id);
+			}
+		}
 
 		const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
-		log.info('Scheduled scan cycle completed', { durationSec });
+		log.info('Scheduled scan cycle completed', { durationSec, playersScanned: players.length });
 		lastRunStatus = 'success';
 		lastRunError = null;
 	} catch (err) {
@@ -107,9 +120,11 @@ export function getCronStatus(): {
 	lastRunStatus: string | null;
 	lastRunError: string | null;
 	nextRunAt: string | null;
+	playerCount: number;
 } {
 	const intervalMs = getIntervalMs();
 	const intervalMinutes = intervalMs / 60000;
+	const players = getPlayers();
 
 	let nextRunAt: string | null = null;
 	if (intervalMs > 0 && lastRunAt) {
@@ -126,6 +141,7 @@ export function getCronStatus(): {
 		lastRunAt: lastRunAt?.toISOString() ?? null,
 		lastRunStatus,
 		lastRunError,
-		nextRunAt
+		nextRunAt,
+		playerCount: players.length
 	};
 }

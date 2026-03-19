@@ -1,6 +1,6 @@
 import db from './db.js';
 import { getLibraryPath } from './settings.js';
-import { getPlayerManagedPath } from './player.js';
+import { getPlayerManagedPath, getPlayer } from './players.js';
 import { createLogger } from './logger.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,30 +42,37 @@ export interface SyncProgress {
 type ProgressCallback = (progress: SyncProgress) => void;
 
 /**
- * Copy tracks from the library to the player.
- * Accepts an array of library track IDs.
+ * Copy tracks from the library to a specific player.
+ * Accepts a player ID and an array of library track IDs.
  */
 export async function copyToPlayer(
+	playerId: number,
 	trackIds: number[],
 	onProgress?: ProgressCallback
 ): Promise<{ copied: number; failed: number; errors: string[] }> {
+	const player = getPlayer(playerId);
+	if (!player) {
+		log.error('Cannot copy to player: player not found', { playerId });
+		throw new Error('Player not found');
+	}
+
 	const libraryPath = getLibraryPath();
-	const managedPath = getPlayerManagedPath();
+	const managedPath = getPlayerManagedPath(playerId);
 
 	if (!managedPath) {
-		log.error('Cannot copy to player: managed directory not configured');
+		log.error('Cannot copy to player: managed directory not configured', { playerId });
 		throw new Error('Managed directory not configured');
 	}
 
-	log.info('Starting copy to player', { trackCount: trackIds.length, managedPath });
+	log.info('Starting copy to player', { playerId, trackCount: trackIds.length, managedPath });
 
-	const job = db.prepare("INSERT INTO jobs (type, status, total) VALUES ('sync', 'running', ?)").run(trackIds.length);
+	const job = db.prepare("INSERT INTO jobs (type, status, total, player_id) VALUES ('sync', 'running', ?, ?)").run(trackIds.length, playerId);
 	const jobId = job.lastInsertRowid;
 
 	const getTrack = db.prepare('SELECT * FROM library_tracks WHERE id = ?');
 	const insertPlayerTrack = db.prepare(`
-		INSERT OR REPLACE INTO player_tracks (relative_path, library_track_id, file_size, is_orphan, synced_at)
-		VALUES (?, ?, ?, 0, datetime('now'))
+		INSERT OR REPLACE INTO player_tracks (player_id, relative_path, library_track_id, file_size, is_orphan, synced_at)
+		VALUES (?, ?, ?, ?, 0, datetime('now'))
 	`);
 
 	let copied = 0;
@@ -117,7 +124,7 @@ export async function copyToPlayer(
 			const stat = fs.statSync(destPath);
 
 			// Update database
-			insertPlayerTrack.run(track.relative_path, track.id, stat.size);
+			insertPlayerTrack.run(playerId, track.relative_path, track.id, stat.size);
 			copied++;
 		} catch (err) {
 			failed++;
@@ -138,48 +145,55 @@ export async function copyToPlayer(
 		"UPDATE jobs SET status = 'completed', progress = total, finished_at = datetime('now') WHERE id = ?"
 	).run(jobId);
 
-	log.info('Copy to player completed', { copied, failed, errors: errors.length > 0 ? errors : undefined });
+	log.info('Copy to player completed', { playerId, copied, failed, errors: errors.length > 0 ? errors : undefined });
 	onProgress?.({ phase: 'complete', current: trackIds.length, total: trackIds.length });
 
 	return { copied, failed, errors };
 }
 
 /**
- * Remove tracks from the player.
- * Accepts an array of player track IDs.
+ * Remove tracks from a specific player.
+ * Accepts a player ID and an array of player track IDs.
  */
 export async function removeFromPlayer(
+	playerId: number,
 	trackIds: number[],
 	onProgress?: ProgressCallback
 ): Promise<{ removed: number; failed: number; errors: string[] }> {
-	const managedPath = getPlayerManagedPath();
+	const player = getPlayer(playerId);
+	if (!player) {
+		log.error('Cannot remove from player: player not found', { playerId });
+		throw new Error('Player not found');
+	}
+
+	const managedPath = getPlayerManagedPath(playerId);
 
 	if (!managedPath) {
-		log.error('Cannot remove from player: managed directory not configured');
+		log.error('Cannot remove from player: managed directory not configured', { playerId });
 		throw new Error('Managed directory not configured');
 	}
 
-	log.info('Starting removal from player', { trackCount: trackIds.length, managedPath });
+	log.info('Starting removal from player', { playerId, trackCount: trackIds.length, managedPath });
 
-	const job = db.prepare("INSERT INTO jobs (type, status, total) VALUES ('sync', 'running', ?)").run(trackIds.length);
+	const job = db.prepare("INSERT INTO jobs (type, status, total, player_id) VALUES ('sync', 'running', ?, ?)").run(trackIds.length, playerId);
 	const jobId = job.lastInsertRowid;
 
-	const getTrack = db.prepare('SELECT * FROM player_tracks WHERE id = ?');
-	const deleteTrack = db.prepare('DELETE FROM player_tracks WHERE id = ?');
+	const getTrack = db.prepare('SELECT * FROM player_tracks WHERE id = ? AND player_id = ?');
+	const deleteTrack = db.prepare('DELETE FROM player_tracks WHERE id = ? AND player_id = ?');
 
 	let removed = 0;
 	let failed = 0;
 	const errors: string[] = [];
 
 	for (let i = 0; i < trackIds.length; i++) {
-		const track = getTrack.get(trackIds[i]) as {
+		const track = getTrack.get(trackIds[i], playerId) as {
 			id: number;
 			relative_path: string;
 		} | undefined;
 
 		if (!track) {
 			failed++;
-			errors.push(`Player track ID ${trackIds[i]} not found`);
+			errors.push(`Player track ID ${trackIds[i]} not found for player ${playerId}`);
 			continue;
 		}
 
@@ -209,7 +223,7 @@ export async function removeFromPlayer(
 				}
 			}
 
-			deleteTrack.run(track.id);
+			deleteTrack.run(track.id, playerId);
 			removed++;
 		} catch (err) {
 			failed++;
@@ -224,7 +238,7 @@ export async function removeFromPlayer(
 		"UPDATE jobs SET status = 'completed', progress = total, finished_at = datetime('now') WHERE id = ?"
 	).run(jobId);
 
-	log.info('Removal from player completed', { removed, failed, errors: errors.length > 0 ? errors : undefined });
+	log.info('Removal from player completed', { playerId, removed, failed, errors: errors.length > 0 ? errors : undefined });
 	onProgress?.({ phase: 'complete', current: trackIds.length, total: trackIds.length });
 
 	return { removed, failed, errors };
