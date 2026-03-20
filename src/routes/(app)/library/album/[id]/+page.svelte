@@ -21,6 +21,7 @@
 	let tracks = $state<Track[]>([]);
 	let loading = $state(true);
 	let syncing = $state(false);
+	let removing = $state(false);
 	let selectedIds = $state<Set<number>>(new Set());
 	let albumName = $state('');
 	let artistName = $state('');
@@ -132,6 +133,29 @@
 		await loadTracks();
 	}
 
+	async function removeAlbum() {
+		if (syncedCount === 0) return;
+		removing = true;
+		try {
+			const res = await fetch('/api/sync/remove', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ artist: artistName, album: albumName })
+			});
+			const result = await res.json();
+			if (result.failed > 0) {
+				addToast('error', `Failed to remove ${result.failed} tracks`, result.errors?.[0] || '', 10000);
+			}
+			if (result.removed > 0) {
+				addToast('success', `Removed ${result.removed} track${result.removed > 1 ? 's' : ''} from player`);
+			}
+		} catch {
+			addToast('error', 'Remove request failed', 'Could not connect to the server');
+		}
+		removing = false;
+		await loadTracks();
+	}
+
 	let syncedCount = $derived(tracks.filter(t => t.is_synced).length);
 	let totalSize = $derived(tracks.reduce((s, t) => s + (t.file_size || 0), 0));
 	let totalDuration = $derived(tracks.reduce((s, t) => s + (t.duration || 0), 0));
@@ -140,7 +164,7 @@
 </script>
 
 <div class="album-page">
-	<a href="/library" class="back-link">← Library</a>
+	<a href="/library" class="back-link">← Music</a>
 
 	{#if loading}
 		<div class="loading-state">
@@ -187,6 +211,11 @@
 				{/if}
 				{#if tracks.some(t => !t.is_synced)}
 					<button class="btn-action-ghost" onclick={selectAllUnsynced}>Select unsynced</button>
+				{/if}
+				{#if syncedCount > 0}
+					<button class="btn-action-danger" onclick={removeAlbum} disabled={removing}>
+						{removing ? 'Removing...' : 'Remove from player'}
+					</button>
 				{/if}
 			{/if}
 		</div>
@@ -380,6 +409,29 @@
 	.btn-action-ghost:hover {
 		border-color: var(--color-text-faint);
 		color: var(--color-text);
+	}
+
+	.btn-action-danger {
+		padding: 0.375rem 0.875rem;
+		border-radius: 5px;
+		border: 1px solid var(--color-danger);
+		background: transparent;
+		color: var(--color-danger);
+		font-size: 0.8125rem;
+		font-weight: 500;
+		cursor: pointer;
+		font-family: inherit;
+		transition: background 0.15s, color 0.15s;
+	}
+
+	.btn-action-danger:hover:not(:disabled) {
+		background: var(--color-danger);
+		color: #fff;
+	}
+
+	.btn-action-danger:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	/* Track list */

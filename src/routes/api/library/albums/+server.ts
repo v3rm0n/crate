@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import db from '$lib/server/db.js';
+import { getActivePlayerId } from '$lib/server/players.js';
 import type { RequestHandler } from './$types.js';
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -9,9 +10,20 @@ export const GET: RequestHandler = async ({ url }) => {
 	const page = parseInt(url.searchParams.get('page') || '1');
 	const limit = parseInt(url.searchParams.get('limit') || '50');
 	const offset = (page - 1) * limit;
+	const playerIdParam = url.searchParams.get('player_id');
+	const playerId = playerIdParam ? parseInt(playerIdParam, 10) : getActivePlayerId();
+
+	const params: (string | number)[] = [];
+	let playerJoin: string;
+
+	if (playerId) {
+		playerJoin = 'LEFT JOIN player_tracks pt ON pt.library_track_id = lt.id AND pt.player_id = ?';
+		params.push(playerId);
+	} else {
+		playerJoin = 'LEFT JOIN player_tracks pt ON pt.library_track_id = lt.id';
+	}
 
 	let whereClause = 'WHERE 1=1';
-	const params: (string | number)[] = [];
 
 	if (artist) {
 		whereClause += ' AND (lt.album_artist = ? OR lt.artist = ?)';
@@ -37,7 +49,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		SELECT COUNT(*) as total FROM (
 			SELECT lt.album
 			FROM library_tracks lt
-			LEFT JOIN player_tracks pt ON pt.library_track_id = lt.id
+			${playerJoin}
 			${whereClause}
 			GROUP BY lt.album, COALESCE(lt.album_artist, lt.artist)
 			${havingClause}
@@ -56,7 +68,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			SUM(lt.file_size) as total_size,
 			MIN(lt.id) as first_track_id
 		FROM library_tracks lt
-		LEFT JOIN player_tracks pt ON pt.library_track_id = lt.id
+		${playerJoin}
 		${whereClause}
 		GROUP BY lt.album, COALESCE(lt.album_artist, lt.artist)
 		${havingClause}
@@ -68,6 +80,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	return json({
 		albums,
+		playerId,
 		pagination: { page, limit, total, pages: Math.ceil(total / limit) }
 	});
 };

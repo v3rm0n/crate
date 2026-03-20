@@ -21,8 +21,7 @@
 	} = $props();
 
 	const navItems = [
-		{ href: '/library', label: 'Library', icon: 'library' },
-		{ href: '/player', label: 'Player', icon: 'player' },
+		{ href: '/library', label: 'Music', icon: 'library' },
 		{ href: '/settings', label: 'Settings', icon: 'settings' }
 	];
 
