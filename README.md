@@ -8,6 +8,12 @@ A web application for managing music on portable audio players. Runs as a Docker
 
 Works with any DAP (digital audio player) that presents itself as a USB drive — Rockbox players, iPods, Sony Walkmans, FiiO, Shanling, and more.
 
+## Screenshots
+
+| Library — Artists | Library — Albums | Album detail |
+|---|---|---|
+| ![Artists view](docs/screenshots/library-artists.png) | ![Albums view](docs/screenshots/library-albums.png) | ![Album detail](docs/screenshots/album-detail.png) |
+
 ## Features
 
 - **Library browser** — browse your music library by artist and album with search
