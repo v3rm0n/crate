@@ -1,42 +1,89 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 
+	interface DiscoveredDevice {
+		name: string;
+		path: string;
+	}
+
 	let step = $state(1);
-	let currentPath = $state('');
-	let directories = $state<{ name: string; path: string; isDir: boolean }[]>([]);
-	let selectedDir = $state('');
+	let discoveredDevices = $state<DiscoveredDevice[]>([]);
+	let selectedDevice = $state<DiscoveredDevice | null>(null);
+	let directories = $state<{ name: string; path: string }[]>([]);
+	let managedDirInput = $state('');
+	let playerNameInput = $state('');
 	let loading = $state(false);
 	let initProgress = $state('');
 	let error = $state('');
-	let newDirName = $state('Music');
+	let mountBase = $state('');
 
-	async function browse(subPath?: string) {
+	async function discoverDevices() {
 		loading = true;
 		try {
 			const res = await fetch('/api/setup/browse', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ path: subPath || '' })
+				body: JSON.stringify({})
 			});
 			const data = await res.json();
-			directories = data.directories;
-			currentPath = subPath || '';
+			discoveredDevices = data.directories || [];
+			mountBase = data.mountBase || '';
 			error = '';
 		} catch {
-			error = 'Failed to browse player filesystem';
+			error = 'Failed to discover devices';
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function selectDevice(device: DiscoveredDevice) {
+		selectedDevice = device;
+		playerNameInput = device.name;
+		managedDirInput = '';
+		directories = [];
+		loading = true;
+		step = 3;
+
+		try {
+			const res = await fetch('/api/players/browse', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ path: device.path })
+			});
+			const data = await res.json();
+			directories = data.directories || [];
+		} catch {
+			error = 'Failed to browse device';
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function browseDirectory(absolutePath: string, relativePath: string) {
+		loading = true;
+		try {
+			const res = await fetch('/api/players/browse', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ path: absolutePath })
+			});
+			const data = await res.json();
+			directories = data.directories || [];
+			managedDirInput = relativePath;
+		} catch {
+			error = 'Failed to browse directory';
 		} finally {
 			loading = false;
 		}
 	}
 
 	async function initializePlayer() {
-		if (!selectedDir) {
-			error = 'Please enter a directory name';
+		if (!selectedDevice) {
+			error = 'No device selected';
 			return;
 		}
 
-		const dir = selectedDir;
-		step = 3;
+		step = 4;
 		initProgress = 'Analyzing existing files...';
 		loading = true;
 
@@ -44,29 +91,33 @@
 			const res = await fetch('/api/setup/init', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ managedDir: dir })
+				body: JSON.stringify({
+					name: playerNameInput || selectedDevice.name,
+					mountPath: selectedDevice.path,
+					managedDir: managedDirInput
+				})
 			});
 			const data = await res.json();
 
 			if (data.success) {
 				initProgress = 'Setup complete!';
-				step = 4;
+				step = 5;
 			} else {
 				error = data.error || 'Setup failed';
-				step = 2;
+				step = 3;
 			}
 		} catch {
 			error = 'Connection error during setup';
-			step = 2;
+			step = 3;
 		} finally {
 			loading = false;
 		}
 	}
 
-	// Start by loading root directories
+	// Discover devices when entering step 2
 	$effect(() => {
 		if (step === 2) {
-			browse();
+			discoverDevices();
 		}
 	});
 </script>
@@ -88,18 +139,23 @@
 			<div class="step-line" class:active={step > 1}></div>
 			<div class="step" class:active={step >= 2} class:done={step > 2}>
 				<span class="step-num">{step > 2 ? '✓' : '2'}</span>
-				<span class="step-label">Choose directory</span>
+				<span class="step-label">Select device</span>
 			</div>
 			<div class="step-line" class:active={step > 2}></div>
 			<div class="step" class:active={step >= 3} class:done={step > 3}>
 				<span class="step-num">{step > 3 ? '✓' : '3'}</span>
+				<span class="step-label">Choose directory</span>
+			</div>
+			<div class="step-line" class:active={step > 3}></div>
+			<div class="step" class:active={step >= 4} class:done={step > 4}>
+				<span class="step-num">{step > 4 ? '✓' : '4'}</span>
 				<span class="step-label">Initialize</span>
 			</div>
 		</div>
 
 		<!-- Step 1: Welcome -->
 		{#if step === 1}
-			<div class="step-content" >
+			<div class="step-content">
 				<h2>Welcome</h2>
 				<p>
 					This application manages music on your portable audio player.
@@ -109,9 +165,9 @@
 				<div class="info-box">
 					<strong>What happens next:</strong>
 					<ol>
-						<li>Pick a directory on your player to manage</li>
+						<li>Select your player device</li>
+						<li>Pick a directory on the player to manage</li>
 						<li>Existing files will be reorganized to match your library structure</li>
-						<li>Files without readable metadata go to an <code>Unsorted</code> folder</li>
 						<li>Your music library and player will be scanned</li>
 					</ol>
 				</div>
@@ -121,38 +177,76 @@
 			</div>
 		{/if}
 
-		<!-- Step 2: Directory picker -->
+		<!-- Step 2: Device picker -->
 		{#if step === 2}
-			<div class="step-content" >
-				<h2>Choose managed directory</h2>
-				<p>Select or create the directory on your player where music will be stored.</p>
+			<div class="step-content">
+				<h2>Select your player</h2>
+				<p>Choose the mounted device that contains your audio player.</p>
 
 				{#if error}
 					<div class="error-box">{error}</div>
 				{/if}
 
-				<!-- Path input -->
-				<div class="path-input">
-					<span class="path-prefix">/player/</span>
-					<input
-						id="new-dir-name"
-						type="text"
-						class="path-editable"
-						bind:value={newDirName}
-						placeholder="Music"
-					/>
-				</div>
-
-				<!-- Existing directories -->
-				{#if !loading && directories.length > 0}
+				{#if loading}
+					<div class="progress-section">
+						<div class="spinner"></div>
+						<p>Discovering devices...</p>
+					</div>
+				{:else if discoveredDevices.length === 0}
+					<div class="info-box">
+						<strong>No devices found</strong>
+						<p>Make sure your player is mounted at <code>{mountBase}</code>.</p>
+						<p>You can set the <code>PLAYER_MOUNT_BASE</code> or <code>PLAYER_BASE_PATH</code> environment variable to change the mount base path.</p>
+					</div>
+				{:else}
 					<div class="existing-dirs">
-						<span class="existing-dirs-label">Or pick an existing directory:</span>
+						<span class="existing-dirs-label">Discovered devices at <code>{mountBase}</code>:</span>
 						<div class="dir-list">
-							{#each directories as dir}
+							{#each discoveredDevices as device}
 								<button
 									class="dir-item"
-									class:selected={newDirName === dir.name}
-									onclick={() => { newDirName = dir.name; }}
+									onclick={() => selectDevice(device)}
+								>
+									<span class="dir-icon">📁</span>
+									<span class="dir-item-name">{device.name}</span>
+									<span class="dir-item-path">{device.path}</span>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<div class="step-actions">
+					<button class="btn btn-ghost" onclick={() => step = 1}>Back</button>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Step 3: Directory picker -->
+		{#if step === 3}
+			<div class="step-content">
+				<h2>Choose managed directory</h2>
+				<p>Select the directory on <strong>{selectedDevice?.name}</strong> where music will be stored, or use the root.</p>
+
+				{#if error}
+					<div class="error-box">{error}</div>
+				{/if}
+
+				{#if loading}
+					<div class="progress-section">
+						<div class="spinner"></div>
+						<p>Loading directories...</p>
+					</div>
+				{:else if directories.length > 0}
+					<div class="existing-dirs">
+						<span class="existing-dirs-label">Directories:</span>
+						<div class="dir-list">
+							{#each directories as dir}
+								{@const relativePath = selectedDevice ? dir.path.slice(selectedDevice.path.length).replace(/^\//, '') : dir.name}
+								<button
+									class="dir-item"
+									class:selected={managedDirInput === relativePath}
+									onclick={() => browseDirectory(dir.path, relativePath)}
 								>
 									<span class="dir-icon">📁</span>
 									<span class="dir-item-name">{dir.name}</span>
@@ -162,12 +256,27 @@
 					</div>
 				{/if}
 
+				<div class="selected-dir-info">
+					<span class="existing-dirs-label">Selected directory:</span>
+					<code>{managedDirInput || '/ (root of device)'}</code>
+				</div>
+
+				<!-- Player name -->
+				<div class="path-input">
+					<span class="path-prefix">Name:</span>
+					<input
+						type="text"
+						class="path-editable"
+						bind:value={playerNameInput}
+						placeholder={selectedDevice?.name || 'My Player'}
+					/>
+				</div>
+
 				<div class="step-actions">
-					<button class="btn btn-ghost" onclick={() => step = 1}>Back</button>
+					<button class="btn btn-ghost" onclick={() => step = 2}>Back</button>
 					<button
 						class="btn btn-primary"
-						disabled={!newDirName.trim()}
-						onclick={() => { selectedDir = newDirName.trim(); initializePlayer(); }}
+						onclick={initializePlayer}
 					>
 						Initialize
 					</button>
@@ -175,9 +284,9 @@
 			</div>
 		{/if}
 
-		<!-- Step 3: Initializing -->
-		{#if step === 3}
-			<div class="step-content" >
+		<!-- Step 4: Initializing -->
+		{#if step === 4}
+			<div class="step-content">
 				<h2>Initializing</h2>
 				<div class="progress-section">
 					<div class="spinner"></div>
@@ -190,16 +299,16 @@
 			</div>
 		{/if}
 
-		<!-- Step 4: Done -->
-		{#if step === 4}
-			<div class="step-content" >
+		<!-- Step 5: Done -->
+		{#if step === 5}
+			<div class="step-content">
 				<h2>All set</h2>
 				<p>
 					Your player is configured and ready. The music library and player
 					have been scanned.
 				</p>
 				<button class="btn btn-primary" onclick={() => goto('/')}>
-					Open dashboard
+					Open Crate
 				</button>
 			</div>
 		{/if}
@@ -479,6 +588,27 @@
 
 	.dir-item-name {
 		flex: 1;
+	}
+
+	.dir-item-path {
+		font-size: 0.75rem;
+		color: var(--color-text-faint);
+		font-family: ui-monospace, monospace;
+	}
+
+	.selected-dir-info {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+		padding: 0.5rem 0.75rem;
+		background: rgba(76, 175, 106, 0.08);
+		border-radius: 6px;
+		font-size: 0.875rem;
+	}
+
+	.selected-dir-info code {
+		color: var(--color-text);
 	}
 
 	/* Progress */

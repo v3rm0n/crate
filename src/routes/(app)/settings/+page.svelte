@@ -15,7 +15,7 @@
 		setupComplete: boolean;
 		managedDir: string | null;
 		libraryPath: string;
-		playerPath: string;
+		playerMountBase: string;
 		cron: CronStatus;
 	}
 
@@ -341,12 +341,8 @@
 						<code class="setting-value">{settings.libraryPath}</code>
 					</div>
 					<div class="setting-row">
-						<span class="setting-label">Player path</span>
-						<code class="setting-value">{settings.playerPath}</code>
-					</div>
-					<div class="setting-row">
-						<span class="setting-label">Managed directory</span>
-						<code class="setting-value">{settings.managedDir || 'Not set'}</code>
+						<span class="setting-label">Player mount base</span>
+						<code class="setting-value">{settings.playerMountBase}</code>
 					</div>
 				</div>
 			</section>

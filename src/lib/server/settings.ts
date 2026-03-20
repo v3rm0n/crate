@@ -22,7 +22,3 @@ export function getManagedDir(): string | undefined {
 export function getLibraryPath(): string {
 	return process.env.LIBRARY_PATH || '/library';
 }
-
-export function getPlayerPath(): string {
-	return process.env.PLAYER_PATH || '/player';
-}

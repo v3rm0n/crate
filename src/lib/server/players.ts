@@ -25,7 +25,7 @@ export interface PlayerWithStats extends Player {
  * This is where drives would be mounted (e.g., /mnt/disks in Unraid).
  */
 export function getPlayerMountBase(): string {
-	return process.env.PLAYER_MOUNT_BASE || getSetting('player_mount_base') || '/player';
+	return process.env.PLAYER_MOUNT_BASE || process.env.PLAYER_BASE_PATH || getSetting('player_mount_base') || '/player';
 }
 
 /**

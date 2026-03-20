@@ -99,7 +99,7 @@ docker run -d \
 | `PORT` | `3000` | HTTP server port |
 | `SCAN_INTERVAL` | `0` (disabled) | Auto-scan interval in minutes (e.g. `60` = rescan every hour) |
 
-**Note:** `PLAYER_PATH` is deprecated. Use `PLAYER_MOUNT_BASE` instead.
+**Note:** `PLAYER_PATH` is deprecated. Use `PLAYER_MOUNT_BASE` (or `PLAYER_BASE_PATH`) instead.
 
 ### Multi-player support
 

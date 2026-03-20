@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
-import { isSetupComplete, getLibraryPath, getPlayerPath } from '$lib/server/settings.js';
+import { isSetupComplete, getLibraryPath } from '$lib/server/settings.js';
+import { getPlayerMountBase } from '$lib/server/players.js';
 import { createLogger } from '$lib/server/logger.js';
 import { startCron } from '$lib/server/cron.js';
 import type { Handle } from '@sveltejs/kit';
@@ -8,18 +9,18 @@ import fs from 'node:fs';
 const log = createLogger('server');
 
 // Log startup configuration on first import
+const libraryPath = getLibraryPath();
+const playerMountBase = getPlayerMountBase();
+
 log.info('Crate starting', {
 	nodeEnv: process.env.NODE_ENV,
-	libraryPath: getLibraryPath(),
-	playerPath: getPlayerPath(),
+	libraryPath,
+	playerMountBase,
 	dataDir: process.env.DATA_DIR || '/data',
 	origin: process.env.ORIGIN || '(not set)'
 });
 
 // Check mount points at startup
-const libraryPath = getLibraryPath();
-const playerPath = getPlayerPath();
-
 if (!fs.existsSync(libraryPath)) {
 	log.warn('Library path does not exist at startup', { libraryPath });
 } else {
@@ -35,14 +36,14 @@ if (!fs.existsSync(libraryPath)) {
 	}
 }
 
-if (!fs.existsSync(playerPath)) {
-	log.warn('Player path does not exist at startup', { playerPath });
+if (!fs.existsSync(playerMountBase)) {
+	log.warn('Player mount base does not exist at startup', { playerMountBase });
 } else {
 	try {
-		const entries = fs.readdirSync(playerPath);
-		log.info('Player directory accessible', { playerPath, entryCount: entries.length, entries: entries.slice(0, 10) });
+		const entries = fs.readdirSync(playerMountBase);
+		log.info('Player mount base accessible', { playerMountBase, entryCount: entries.length, entries: entries.slice(0, 10) });
 	} catch (err) {
-		log.error('Cannot read player directory', { playerPath, error: err instanceof Error ? err.message : String(err) });
+		log.error('Cannot read player mount base', { playerMountBase, error: err instanceof Error ? err.message : String(err) });
 	}
 }
 
