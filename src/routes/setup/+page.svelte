@@ -126,9 +126,14 @@
 	<div class="setup-container">
 		<div class="setup-header">
 			<svg class="setup-icon" viewBox="0 0 24 24" fill="none">
-				<rect x="2" y="2" width="20" height="20" rx="3" fill="var(--color-accent)" opacity="0.15"/>
-				<rect x="5" y="5" width="14" height="14" rx="2" fill="var(--color-accent)" opacity="0.3"/>
-				<rect x="8" y="8" width="8" height="8" rx="1.5" fill="var(--color-accent)"/>
+				<circle cx="12" cy="8" r="5.5" fill="#2d2a25" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.85"/>
+				<circle cx="12" cy="8" r="3.5" fill="none" stroke="#3a362f" stroke-width="0.4" opacity="0.5"/>
+				<circle cx="12" cy="8" r="1.5" fill="var(--color-accent)" opacity="0.9"/>
+				<circle cx="12" cy="8" r="0.5" fill="#1a1815"/>
+				<rect x="3" y="11" width="18" height="11" rx="1.5" fill="var(--color-accent)" opacity="0.85"/>
+				<rect x="3" y="15" width="18" height="0.75" rx="0.375" fill="#1a1815" opacity="0.2"/>
+				<rect x="3" y="18.5" width="18" height="0.75" rx="0.375" fill="#1a1815" opacity="0.2"/>
+				<rect x="8.5" y="13" width="7" height="1.5" rx="0.75" fill="#1a1815" opacity="0.35"/>
 			</svg>
 			<h1>Crate</h1>
 			<p class="setup-subtitle">First-time setup</p>
