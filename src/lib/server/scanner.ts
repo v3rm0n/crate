@@ -226,6 +226,30 @@ export async function scanLibrary(onProgress?: ProgressCallback): Promise<void> 
 			log.info('Removed stale tracks no longer on disk', { removedCount });
 		}
 
+		// Art extraction pass: find albums with no stored art and extract from one track each
+		const albumsWithoutArt = db.prepare(`
+			SELECT
+				COALESCE(album_artist, artist) as artist,
+				album,
+				relative_path
+			FROM library_tracks
+			WHERE album IS NOT NULL
+			  AND COALESCE(album_artist, artist) || ':' || album NOT IN (SELECT id FROM album_art)
+			GROUP BY COALESCE(album_artist, artist), album
+		`).all() as { artist: string; album: string; relative_path: string }[];
+
+		if (albumsWithoutArt.length > 0) {
+			log.info('Extracting art for albums missing covers', { count: albumsWithoutArt.length });
+			for (const row of albumsWithoutArt) {
+				const artKey = `${row.artist || ''}:${row.album}`;
+				const filePath = path.join(libraryPath, row.relative_path);
+				const cover = await extractCover(filePath);
+				if (cover) {
+					insertArtStmt.run(artKey, cover.data, cover.mimeType);
+				}
+			}
+		}
+
 		db.prepare(
 			"UPDATE jobs SET status = 'completed', progress = total, finished_at = datetime('now') WHERE id = ?"
 		).run(jobId);
