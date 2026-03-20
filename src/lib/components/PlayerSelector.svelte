@@ -331,4 +331,15 @@
 		width: 14px;
 		height: 14px;
 	}
+
+	@media (max-width: 768px) {
+		.dropdown {
+			position: fixed;
+			top: auto;
+			bottom: calc(env(safe-area-inset-bottom, 0px) + 60px);
+			left: 0.75rem;
+			right: 0.75rem;
+			min-width: unset;
+		}
+	}
 </style>

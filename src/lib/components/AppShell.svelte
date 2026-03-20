@@ -177,7 +177,88 @@
 		</div>
 	</nav>
 
+	<!-- Mobile top bar -->
+	<header class="mobile-topbar">
+		<a href="/library" class="logo">
+			<svg class="logo-mark" viewBox="0 0 24 24" fill="none">
+				<circle cx="12" cy="8" r="5.5" fill="#2d2a25" stroke="var(--color-accent)" stroke-width="0.5" opacity="0.85"/>
+				<circle cx="12" cy="8" r="3.5" fill="none" stroke="#3a362f" stroke-width="0.4" opacity="0.5"/>
+				<circle cx="12" cy="8" r="1.5" fill="var(--color-accent)" opacity="0.9"/>
+				<circle cx="12" cy="8" r="0.5" fill="#1a1815"/>
+				<rect x="3" y="11" width="18" height="11" rx="1.5" fill="var(--color-accent)" opacity="0.85"/>
+				<rect x="3" y="15" width="18" height="0.75" rx="0.375" fill="#1a1815" opacity="0.2"/>
+				<rect x="3" y="18.5" width="18" height="0.75" rx="0.375" fill="#1a1815" opacity="0.2"/>
+				<rect x="8.5" y="13" width="7" height="1.5" rx="0.75" fill="#1a1815" opacity="0.35"/>
+			</svg>
+			<span class="logo-text">Crate</span>
+		</a>
+		{#if players.length > 0}
+			<PlayerSelector
+				{players}
+				{activePlayer}
+				onSelect={handlePlayerSelect}
+				onAdd={() => window.location.href = '/settings?tab=players'}
+				onManage={() => window.location.href = '/settings?tab=players'}
+			/>
+		{/if}
+	</header>
+
+	<!-- Mobile bottom tab bar -->
+	<nav class="mobile-tabbar">
+		<a
+			href="/library?view=artists"
+			class="tab-item"
+			class:active={isActive('/library') && ['artists', null].includes(page.url.searchParams.get('view')) && !page.url.pathname.startsWith('/library/album')}
+		>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M9 18V5l12-2v13" />
+				<circle cx="6" cy="18" r="3" />
+				<circle cx="18" cy="16" r="3" />
+			</svg>
+			<span>Artists</span>
+		</a>
+		<a
+			href="/library?view=albums"
+			class="tab-item"
+			class:active={isActive('/library') && (page.url.searchParams.get('view') === 'albums' || page.url.pathname.startsWith('/library/album'))}
+		>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+				<rect x="3" y="3" width="7" height="7" rx="1" />
+				<rect x="14" y="3" width="7" height="7" rx="1" />
+				<rect x="3" y="14" width="7" height="7" rx="1" />
+				<rect x="14" y="14" width="7" height="7" rx="1" />
+			</svg>
+			<span>Albums</span>
+		</a>
+		<a
+			href="/library?view=player"
+			class="tab-item"
+			class:active={isActive('/library') && page.url.searchParams.get('view') === 'player'}
+		>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+				<rect x="5" y="3" width="14" height="18" rx="3" />
+				<circle cx="12" cy="15" r="3" />
+				<path d="M9 7h6" />
+			</svg>
+			<span>Player</span>
+		</a>
+		<a
+			href="/settings"
+			class="tab-item"
+			class:active={isActive('/settings')}
+		>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+				<circle cx="12" cy="12" r="3" />
+				<path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+			</svg>
+			<span>Settings</span>
+		</a>
+	</nav>
+
 	<main class="main-content">
+		<div class="mobile-sync-progress">
+			<SyncProgress />
+		</div>
 		{@render children()}
 	</main>
 </div>
@@ -386,71 +467,100 @@
 		padding: 2.25rem 2.75rem;
 	}
 
+	/* Mobile top bar — hidden on desktop */
+	.mobile-topbar {
+		display: none;
+	}
+
+	/* Mobile bottom tab bar — hidden on desktop */
+	.mobile-tabbar {
+		display: none;
+	}
+
+	/* Mobile sync progress — hidden on desktop (shown in sidebar) */
+	.mobile-sync-progress {
+		display: none;
+	}
+
 	@media (max-width: 768px) {
 		.app-shell {
 			flex-direction: column;
+			padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
 		}
 
+		/* Hide the desktop sidebar entirely */
 		.sidebar {
-			width: 100%;
-			height: auto;
-			position: static;
-			padding: 0.75rem 0;
-			border-right: none;
-			border-bottom: 1px solid var(--color-border-subtle);
-			flex-direction: row;
+			display: none;
+		}
+
+		/* Mobile top bar */
+		.mobile-topbar {
+			display: flex;
+			align-items: center;
 			justify-content: space-between;
-			align-items: center;
-			overflow-y: visible;
+			padding: 0.625rem 1rem;
+			background: var(--color-surface);
+			border-bottom: 1px solid var(--color-border-subtle);
+			position: sticky;
+			top: 0;
+			z-index: 20;
+			gap: 0.75rem;
 		}
 
-		.sidebar-top {
-			flex-direction: row;
-			align-items: center;
+		.mobile-topbar .logo {
+			margin-bottom: 0;
+			flex-shrink: 0;
+		}
+
+		.mobile-topbar :global(.player-selector) {
+			margin-top: 0;
 			flex: 1;
+			min-width: 0;
 		}
 
-		.sidebar-bottom {
-			padding-top: 0;
-			border-top: none;
-			padding-right: 0.75rem;
+		/* Mobile bottom tab bar */
+		.mobile-tabbar {
+			display: flex;
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			background: var(--color-surface);
+			border-top: 1px solid var(--color-border-subtle);
+			z-index: 20;
+			padding-bottom: env(safe-area-inset-bottom, 0px);
 		}
 
-		.sidebar-header {
-			padding: 0 0 0 1rem;
-			border-bottom: none;
-			margin-bottom: 0;
+		.tab-item {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 0.25rem;
+			padding: 0.5rem 0;
+			text-decoration: none;
+			color: var(--color-text-faint);
+			font-size: 0.625rem;
+			font-weight: 500;
+			transition: color 0.15s;
 		}
 
-		.logo {
-			margin-bottom: 0;
-			white-space: nowrap;
+		.tab-item svg {
+			width: 20px;
+			height: 20px;
 		}
 
-		.storage-row {
-			display: none;
+		.tab-item.active {
+			color: var(--color-accent);
 		}
 
-		.nav-list {
-			flex-direction: row;
-			padding: 0 0.5rem;
-			overflow-x: auto;
-		}
-
-		.nav-section-label {
-			display: none;
-		}
-
-		.sub-nav {
-			display: none;
-		}
-
-		.nav-link {
-			white-space: nowrap;
+		/* Mobile sync progress — shown above content */
+		.mobile-sync-progress {
+			display: block;
 		}
 
 		.main-content {
-			padding: 1.5rem 1rem;
+			padding: 1.25rem 1rem;
 		}
 	}
 </style>
