@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import db from '$lib/server/db.js';
-import { copyToPlayer } from '$lib/server/sync.js';
+import { startCopyToPlayer } from '$lib/server/sync.js';
 import { getActivePlayerId } from '$lib/server/players.js';
 import { createLogger } from '$lib/server/logger.js';
 import type { RequestHandler } from './$types.js';
@@ -21,7 +21,6 @@ export const POST: RequestHandler = async ({ request }) => {
 	if (Array.isArray(rawTrackIds) && rawTrackIds.length > 0) {
 		trackIds = rawTrackIds;
 	} else if (artist) {
-		// Resolve unsynced track IDs for an artist (and optionally album)
 		let query = `
 			SELECT lt.id FROM library_tracks lt
 			LEFT JOIN player_tracks pt ON pt.library_track_id = lt.id AND pt.player_id = ?
@@ -37,7 +36,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		trackIds = (db.prepare(query).all(...params) as { id: number }[]).map(r => r.id);
 
 		if (trackIds.length === 0) {
-			return json({ copied: 0, failed: 0, errors: [] });
+			return json({ jobId: null, total: 0 });
 		}
 
 		log.info('Resolved tracks for batch sync', { artist, album, playerId, trackCount: trackIds.length });
@@ -47,7 +46,6 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	log.info('Copy to player requested', { playerId, trackCount: trackIds.length });
-	const result = await copyToPlayer(playerId, trackIds);
-	log.info('Copy to player result', { playerId, copied: result.copied, failed: result.failed });
-	return json(result);
+	const jobId = startCopyToPlayer(playerId, trackIds);
+	return json({ jobId, total: trackIds.length });
 };

@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { slide } from 'svelte/transition';
 	import { addToast } from '$lib/stores/toast.svelte.js';
+	import { trackJob, onJobComplete, getActiveJobs } from '$lib/stores/sync.svelte.js';
 
 	// --- Shared types ---
 
@@ -71,7 +72,7 @@
 
 	// Shared
 	let loading = $state(true);
-	let syncing = $state(false);
+	let syncing = $derived(getActiveJobs().some(j => j.type === 'copy' && j.status === 'running'));
 	let searchQuery = $state('');
 	let syncFilter = $state('all');
 	let stats = $state<LibraryStats | null>(null);
@@ -101,11 +102,11 @@
 	let playerTotalPages = $state(1);
 	let playerTotal = $state(0);
 	let playerSelectedIds = $state<Set<number>>(new Set());
-	let removing = $state(false);
+	let removing = $derived(getActiveJobs().some(j => j.type === 'remove' && j.status === 'running'));
 	let orphans = $state<{ id: number; relative_path: string; file_size: number }[]>([]);
 	let showDeleteAllConfirm = $state(false);
 	let deleteConfirmText = $state('');
-	let removingAll = $state(false);
+	let removingAll = $derived(getActiveJobs().some(j => j.type === 'remove' && j.status === 'running'));
 
 	// --- Helpers ---
 
@@ -265,35 +266,39 @@
 	// --- Artists actions ---
 
 	async function syncArtist(artistName: string) {
-		syncing = true;
 		try {
 			const res = await fetch('/api/sync/copy', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ artist: artistName })
 			});
-			const result = await res.json();
-			if (result.copied > 0) addToast('success', `Synced ${result.copied} tracks from ${artistName}`);
-			if (result.failed > 0) addToast('error', `Failed to sync ${result.failed} tracks`, result.errors?.[0], 10000);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Syncing ${data.total} tracks from ${artistName}...`);
+				trackJob(data.jobId, 'copy', artistName);
+				onJobComplete(data.jobId, () => { loadArtists(); loadStats(); });
+			} else {
+				addToast('success', `${artistName} is already fully synced`);
+			}
 		} catch { addToast('error', 'Sync failed'); }
-		syncing = false;
-		await Promise.all([loadArtists(), loadStats()]);
 	}
 
 	async function removeArtist(artistName: string) {
-		syncing = true;
 		try {
 			const res = await fetch('/api/sync/remove', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ artist: artistName })
 			});
-			const result = await res.json();
-			if (result.removed > 0) addToast('success', `Removed ${result.removed} tracks by ${artistName}`);
-			if (result.failed > 0) addToast('error', `Failed to remove ${result.failed} tracks`, result.errors?.[0], 10000);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Removing tracks by ${artistName}...`);
+				trackJob(data.jobId, 'remove', artistName);
+				onJobComplete(data.jobId, () => { loadArtists(); loadStats(); });
+			} else {
+				addToast('success', `No tracks to remove for ${artistName}`);
+			}
 		} catch { addToast('error', 'Remove failed'); }
-		syncing = false;
-		await Promise.all([loadArtists(), loadStats()]);
 	}
 
 	function showArtistAlbums(artistName: string) {
@@ -306,35 +311,39 @@
 	// --- Albums actions ---
 
 	async function syncAlbum(artistName: string, albumName: string) {
-		syncing = true;
 		try {
 			const res = await fetch('/api/sync/copy', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ artist: artistName, album: albumName })
 			});
-			const result = await res.json();
-			if (result.copied > 0) addToast('success', `Synced ${result.copied} tracks from "${albumName}"`);
-			if (result.failed > 0) addToast('error', `Failed to sync ${result.failed} tracks`, result.errors?.[0], 10000);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Syncing ${data.total} tracks from "${albumName}"...`);
+				trackJob(data.jobId, 'copy', albumName);
+				onJobComplete(data.jobId, () => { loadAlbums(); loadStats(); });
+			} else {
+				addToast('success', `"${albumName}" is already fully synced`);
+			}
 		} catch { addToast('error', 'Sync failed'); }
-		syncing = false;
-		await Promise.all([loadAlbums(), loadStats()]);
 	}
 
 	async function removeAlbum(artistName: string, albumName: string) {
-		syncing = true;
 		try {
 			const res = await fetch('/api/sync/remove', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ artist: artistName, album: albumName })
 			});
-			const result = await res.json();
-			if (result.removed > 0) addToast('success', `Removed ${result.removed} tracks from "${albumName}"`);
-			if (result.failed > 0) addToast('error', `Failed to remove ${result.failed} tracks`, result.errors?.[0], 10000);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Removing tracks from "${albumName}"...`);
+				trackJob(data.jobId, 'remove', albumName);
+				onJobComplete(data.jobId, () => { loadAlbums(); loadStats(); });
+			} else {
+				addToast('success', `No tracks to remove from "${albumName}"`);
+			}
 		} catch { addToast('error', 'Remove failed'); }
-		syncing = false;
-		await Promise.all([loadAlbums(), loadStats()]);
 	}
 
 	// --- Tracks actions ---
@@ -381,20 +390,20 @@
 	async function syncSelected() {
 		const ids = [...selectedIds];
 		if (ids.length === 0) return;
-		syncing = true;
 		try {
 			const res = await fetch('/api/sync/copy', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ trackIds: ids })
 			});
-			const result = await res.json();
-			if (result.copied > 0) addToast('success', `Synced ${result.copied} track${result.copied > 1 ? 's' : ''}`);
-			if (result.failed > 0) addToast('error', `Failed to sync ${result.failed} tracks`, result.errors?.[0], 10000);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Syncing ${data.total} track${data.total > 1 ? 's' : ''}...`);
+				trackJob(data.jobId, 'copy', `${data.total} tracks`);
+				onJobComplete(data.jobId, () => { loadTracks(); loadStats(); });
+			}
 		} catch { addToast('error', 'Sync failed'); }
 		selectedIds = new Set();
-		syncing = false;
-		await Promise.all([loadTracks(), loadStats()]);
 	}
 
 	// --- Player actions ---
@@ -408,38 +417,40 @@
 
 	async function removeSelectedPlayer() {
 		if (playerSelectedIds.size === 0) return;
-		removing = true;
 		try {
 			const res = await fetch('/api/sync/remove', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ trackIds: [...playerSelectedIds] })
 			});
-			const result = await res.json();
-			if (result.removed > 0) addToast('success', `Removed ${result.removed} tracks`);
-			if (result.failed > 0) addToast('error', `Failed to remove ${result.failed} tracks`, result.errors?.[0], 10000);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Removing ${data.total} tracks...`);
+				trackJob(data.jobId, 'remove', `${data.total} tracks`);
+				onJobComplete(data.jobId, () => { loadPlayerData(); loadStats(); });
+			}
 		} catch { addToast('error', 'Remove failed'); }
 		playerSelectedIds = new Set();
-		removing = false;
-		await Promise.all([loadPlayerData(), loadStats()]);
 	}
 
 	async function removeAll() {
-		removingAll = true;
 		try {
 			const res = await fetch('/api/sync/remove-all', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({})
 			});
-			const result = await res.json();
-			if (result.removed > 0) addToast('success', `Removed all ${result.removed} tracks`);
-			if (result.failed > 0) addToast('error', `Failed to remove ${result.failed} tracks`, result.errors?.[0], 10000);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Removing all ${data.total} tracks...`);
+				trackJob(data.jobId, 'remove', `All ${data.total} tracks`);
+				onJobComplete(data.jobId, () => { loadPlayerData(); loadStats(); });
+			} else {
+				addToast('success', 'No tracks to remove');
+			}
 		} catch { addToast('error', 'Remove all failed'); }
-		removingAll = false;
 		showDeleteAllConfirm = false;
 		deleteConfirmText = '';
-		await Promise.all([loadPlayerData(), loadStats()]);
 	}
 
 	let deleteConfirmValid = $derived(deleteConfirmText === 'DELETE ALL');

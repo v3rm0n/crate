@@ -16,8 +16,7 @@ log.info('Crate starting', {
 	nodeEnv: process.env.NODE_ENV,
 	libraryPath,
 	playerMountBase,
-	dataDir: process.env.DATA_DIR || '/data',
-	origin: process.env.ORIGIN || '(not set)'
+	dataDir: process.env.DATA_DIR || '/data'
 });
 
 // Check mount points at startup

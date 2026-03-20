@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { addToast } from '$lib/stores/toast.svelte.js';
+	import { trackJob, onJobComplete, getActiveJobs } from '$lib/stores/sync.svelte.js';
 
 	interface Track {
 		id: number;
@@ -20,8 +21,8 @@
 
 	let tracks = $state<Track[]>([]);
 	let loading = $state(true);
-	let syncing = $state(false);
-	let removing = $state(false);
+	let syncing = $derived(getActiveJobs().some(j => j.type === 'copy' && j.status === 'running'));
+	let removing = $derived(getActiveJobs().some(j => j.type === 'remove' && j.status === 'running'));
 	let selectedIds = $state<Set<number>>(new Set());
 	let albumName = $state('');
 	let artistName = $state('');
@@ -86,81 +87,61 @@
 	async function syncSelected() {
 		const ids = [...selectedIds];
 		if (ids.length === 0) return;
-		syncing = true;
-
 		try {
 			const res = await fetch('/api/sync/copy', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ trackIds: ids })
 			});
-			const result = await res.json();
-
-			if (result.failed > 0) {
-				const detail = result.errors?.[0] || 'Unknown error';
-				addToast('error', `Failed to sync ${result.failed} of ${ids.length} tracks`, detail, 10000);
-			}
-			if (result.copied > 0) {
-				addToast('success', `Synced ${result.copied} track${result.copied > 1 ? 's' : ''} to player`);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Syncing ${data.total} track${data.total > 1 ? 's' : ''}...`);
+				trackJob(data.jobId, 'copy', albumName);
+				onJobComplete(data.jobId, () => loadTracks());
 			}
 		} catch {
 			addToast('error', 'Sync request failed', 'Could not connect to the server');
 		}
-
 		selectedIds = new Set();
-		syncing = false;
-		await loadTracks();
 	}
 
 	async function syncAll() {
 		const ids = tracks.filter(t => !t.is_synced).map(t => t.id);
 		if (ids.length === 0) return;
-		syncing = true;
-
 		try {
 			const res = await fetch('/api/sync/copy', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ trackIds: ids })
 			});
-			const result = await res.json();
-
-			if (result.failed > 0) {
-				const detail = result.errors?.[0] || 'Unknown error';
-				addToast('error', `Failed to sync ${result.failed} of ${ids.length} tracks`, detail, 10000);
-			}
-			if (result.copied > 0) {
-				addToast('success', `Synced ${result.copied} track${result.copied > 1 ? 's' : ''} to player`);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Syncing ${data.total} track${data.total > 1 ? 's' : ''}...`);
+				trackJob(data.jobId, 'copy', albumName);
+				onJobComplete(data.jobId, () => loadTracks());
 			}
 		} catch {
 			addToast('error', 'Sync request failed', 'Could not connect to the server');
 		}
-
-		syncing = false;
-		await loadTracks();
 	}
 
 	async function removeAlbum() {
 		if (syncedCount === 0) return;
-		removing = true;
 		try {
 			const res = await fetch('/api/sync/remove', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ artist: artistName, album: albumName })
 			});
-			const result = await res.json();
-			if (result.failed > 0) {
-				addToast('error', `Failed to remove ${result.failed} tracks`, result.errors?.[0] || '', 10000);
-			}
-			if (result.removed > 0) {
-				addToast('success', `Removed ${result.removed} track${result.removed > 1 ? 's' : ''} from player`);
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Removing tracks from "${albumName}"...`);
+				trackJob(data.jobId, 'remove', albumName);
+				onJobComplete(data.jobId, () => loadTracks());
 			}
 		} catch {
 			addToast('error', 'Remove request failed', 'Could not connect to the server');
 		}
-		removing = false;
-		await loadTracks();
 	}
 
 	function albumGradient(name: string): string {

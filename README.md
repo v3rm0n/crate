@@ -57,7 +57,6 @@ services:
       # For multi-player mode (recommended for Unraid):
       - /mnt/disks:/mnt/disks
     environment:
-      - ORIGIN=http://localhost:3000
       # For multi-player mode:
       - PLAYER_MOUNT_BASE=/mnt/disks
     restart: unless-stopped
@@ -83,7 +82,6 @@ docker run -d \
   -v crate-data:/data \
   -v /path/to/your/music/library:/library:ro \
   -v /mnt/disks:/mnt/disks \
-  -e ORIGIN=http://localhost:3000 \
   -e PLAYER_MOUNT_BASE=/mnt/disks \
   ghcr.io/v3rm0n/crate:latest
 ```
@@ -92,14 +90,11 @@ docker run -d \
 
 | Variable | Default | Description |
 |---|---|---|
-| `ORIGIN` | `http://localhost:3000` | The public URL of the app (required for CSRF protection) |
 | `DATA_DIR` | `/data` | Where the SQLite database is stored |
 | `LIBRARY_PATH` | `/library` | Mount point for the music library |
 | `PLAYER_MOUNT_BASE` | `/player` | Base mount path for discovering players (e.g., `/mnt/disks` for Unraid) |
 | `PORT` | `3000` | HTTP server port |
 | `SCAN_INTERVAL` | `0` (disabled) | Auto-scan interval in minutes (e.g. `60` = rescan every hour) |
-
-**Note:** `PLAYER_PATH` is deprecated. Use `PLAYER_MOUNT_BASE` (or `PLAYER_BASE_PATH`) instead.
 
 ### Multi-player support
 

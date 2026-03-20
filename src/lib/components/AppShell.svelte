@@ -2,6 +2,13 @@
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import PlayerSelector from './PlayerSelector.svelte';
+	import SyncProgress from './SyncProgress.svelte';
+	import { recoverRunningJobs } from '$lib/stores/sync.svelte.js';
+
+	// Recover any running jobs on page load
+	$effect(() => {
+		recoverRunningJobs();
+	});
 
 	interface Player {
 		id: number;
@@ -144,7 +151,9 @@
 			</ul>
 		</div>
 
-		<div class="sidebar-bottom">
+		<SyncProgress />
+
+	<div class="sidebar-bottom">
 			<ul class="nav-list">
 				<li>
 					<a

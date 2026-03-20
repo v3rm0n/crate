@@ -25,7 +25,6 @@ RUN mkdir -p /library /player /data
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV ORIGIN=http://localhost:3000
 ENV DATA_DIR=/data
 ENV LIBRARY_PATH=/library
 ENV PLAYER_MOUNT_BASE=/player

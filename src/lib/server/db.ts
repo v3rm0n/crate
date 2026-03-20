@@ -117,6 +117,15 @@ function migrate(db: Database.Database): void {
 }
 
 function migrateData(db: Database.Database): void {
+	// Add result column to jobs table if missing
+	const hasResultColumn = db.prepare(`
+		SELECT 1 FROM pragma_table_info('jobs') WHERE name = 'result'
+	`).get();
+	if (!hasResultColumn) {
+		db.exec('ALTER TABLE jobs ADD COLUMN result TEXT');
+		log.info('Added result column to jobs table');
+	}
+
 	// Check if we need to migrate from single-player to multi-player schema
 	const hasPlayerIdColumn = db.prepare(`
 		SELECT 1 FROM pragma_table_info('player_tracks') WHERE name = 'player_id'

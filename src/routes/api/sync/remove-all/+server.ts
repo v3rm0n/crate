@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import db from '$lib/server/db.js';
-import { removeFromPlayer } from '$lib/server/sync.js';
+import { startRemoveFromPlayer } from '$lib/server/sync.js';
 import { getActivePlayerId } from '$lib/server/players.js';
 import { createLogger } from '$lib/server/logger.js';
 import type { RequestHandler } from './$types.js';
@@ -20,11 +20,10 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	if (trackIds.length === 0) {
 		log.info('Remove all requested but no tracks on player', { playerId });
-		return json({ removed: 0, failed: 0, errors: [] });
+		return json({ jobId: null, total: 0 });
 	}
 
 	log.info('Remove ALL tracks from player requested', { playerId, trackCount: trackIds.length });
-	const result = await removeFromPlayer(playerId, trackIds);
-	log.info('Remove all result', { playerId, removed: result.removed, failed: result.failed });
-	return json(result);
+	const jobId = startRemoveFromPlayer(playerId, trackIds);
+	return json({ jobId, total: trackIds.length });
 };
