@@ -95,6 +95,13 @@ function migrate(db: Database.Database): void {
 			player_id   INTEGER REFERENCES players(id) ON DELETE SET NULL
 		);
 
+		CREATE TABLE IF NOT EXISTS album_art (
+			id        TEXT PRIMARY KEY,
+			data      BLOB NOT NULL,
+			mime_type TEXT NOT NULL DEFAULT 'image/jpeg',
+			created_at TEXT NOT NULL DEFAULT (datetime('now'))
+		);
+
 		CREATE INDEX IF NOT EXISTS idx_library_tracks_artist ON library_tracks(artist);
 		CREATE INDEX IF NOT EXISTS idx_library_tracks_album ON library_tracks(album);
 		CREATE INDEX IF NOT EXISTS idx_library_tracks_album_artist ON library_tracks(album_artist);
@@ -141,7 +148,7 @@ function migrateData(db: Database.Database): void {
 		if (existingTracks.count > 0) {
 			// Get the legacy settings to create a default player
 			const managedDir = db.prepare("SELECT value FROM settings WHERE key = 'managed_dir'").get() as { value: string } | undefined;
-			const playerPath = process.env.PLAYER_PATH || '/player';
+			const playerPath = process.env.PLAYER_MOUNT_BASE || '/player';
 
 			// Create default player from legacy settings
 			const result = db.prepare(`

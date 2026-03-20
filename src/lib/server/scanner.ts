@@ -1,6 +1,6 @@
 import db from './db.js';
 import { getLibraryPath } from './settings.js';
-import { extractMetadata, isSupportedAudioFile } from './metadata.js';
+import { extractMetadata, extractCover, isSupportedAudioFile } from './metadata.js';
 import { createLogger } from './logger.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -123,6 +123,14 @@ export async function scanLibrary(onProgress?: ProgressCallback): Promise<void> 
 				scanned_at = datetime('now')
 		`);
 
+		// Load existing art keys so we don't re-extract art we already have
+		const existingArtKeys = new Set<string>(
+			(db.prepare('SELECT id FROM album_art').all() as { id: string }[]).map(r => r.id)
+		);
+		const insertArtStmt = db.prepare(
+			'INSERT OR IGNORE INTO album_art (id, data, mime_type) VALUES (?, ?, ?)'
+		);
+
 		let skippedCount = 0;
 		let insertedCount = 0;
 		let metadataFailCount = 0;
@@ -168,6 +176,18 @@ export async function scanLibrary(onProgress?: ProgressCallback): Promise<void> 
 					mtime
 				);
 				insertedCount++;
+
+				// Try to extract album art if we don't already have it for this album
+				if (metadata.album) {
+					const artKey = `${metadata.albumArtist || metadata.artist || ''}:${metadata.album}`;
+					if (!existingArtKeys.has(artKey)) {
+						existingArtKeys.add(artKey); // Mark as seen to avoid re-extraction within this scan
+						const cover = await extractCover(filePath);
+						if (cover) {
+							insertArtStmt.run(artKey, cover.data, cover.mimeType);
+						}
+					}
+				}
 			} else {
 				metadataFailCount++;
 				log.warn('Failed to extract metadata', { file: relativePath });

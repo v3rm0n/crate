@@ -605,8 +605,14 @@
 					<div class="list-row album-row">
 						<a class="row-main" href="/library/album/{albumId}">
 							<span class="sync-dot {status}"></span>
+							{@const artUrl = `/api/library/art/${encodeURIComponent((album.artist || '') + ':' + album.album)}`}
 							<div class="album-art-sm" style="background: {albumGradient(album.album)}">
-								<span>{album.album.charAt(0)}</span>
+								<img
+									src={artUrl}
+									alt=""
+									class="album-art-img"
+									onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+								/>
 							</div>
 							<div class="album-info">
 								<span class="row-name">{album.album}</span>
@@ -1084,12 +1090,16 @@
 	.album-art-sm {
 		width: 36px; height: 36px; border-radius: 4px;
 		display: flex; align-items: center; justify-content: center;
-		flex-shrink: 0;
+		flex-shrink: 0; overflow: hidden; position: relative;
 	}
 	.album-art-sm span {
 		font-family: var(--font-display); font-size: 1rem;
 		color: rgba(255, 255, 255, 0.6); font-weight: 400;
 		text-transform: uppercase;
+	}
+	.album-art-img {
+		position: absolute; inset: 0; width: 100%; height: 100%;
+		object-fit: cover; border-radius: 4px;
 	}
 
 	/* Floating selection toolbar */

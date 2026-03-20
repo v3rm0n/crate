@@ -181,8 +181,15 @@
 		</div>
 	{:else}
 		<header class="album-header">
+			{@const artUrl = `/api/library/art/${encodeURIComponent(artistName + ':' + albumName)}`}
 			<div class="album-art-large" style="background: {albumGradient(albumName || '?')}">
 				<span>{albumName?.charAt(0) || '?'}</span>
+				<img
+					src={artUrl}
+					alt=""
+					class="album-art-img"
+					onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+				/>
 			</div>
 			<div class="album-details">
 				<h1>{albumName}</h1>
@@ -309,6 +316,8 @@
 		justify-content: center;
 		flex-shrink: 0;
 		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+		overflow: hidden;
+		position: relative;
 	}
 
 	.album-art-large span {
@@ -317,6 +326,14 @@
 		color: rgba(255, 255, 255, 0.6);
 		font-weight: 400;
 		text-transform: uppercase;
+	}
+
+	.album-art-img {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 
 	.album-details {

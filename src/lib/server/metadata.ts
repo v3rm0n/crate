@@ -39,6 +39,25 @@ export function getFormatFromExtension(filePath: string): string {
 	return formatMap[ext] || ext.toUpperCase();
 }
 
+export interface CoverData {
+	data: Buffer;
+	mimeType: string;
+}
+
+export async function extractCover(filePath: string): Promise<CoverData | null> {
+	try {
+		const metadata = await parseFile(filePath, { skipCovers: false, duration: false });
+		const picture = metadata.common.picture?.[0];
+		if (!picture) return null;
+		return {
+			data: Buffer.from(picture.data),
+			mimeType: picture.format || 'image/jpeg'
+		};
+	} catch {
+		return null;
+	}
+}
+
 export async function extractMetadata(filePath: string): Promise<TrackMetadata | null> {
 	try {
 		const metadata = await parseFile(filePath, { skipCovers: true });
