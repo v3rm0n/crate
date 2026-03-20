@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	interface CronStatus {
 		enabled: boolean;
@@ -220,6 +221,7 @@
 			if (res.ok) {
 				closeAddPlayerModal();
 				await loadPlayers();
+				await invalidateAll();
 			}
 		} finally {
 			savingPlayer = false;
@@ -257,6 +259,7 @@
 		if (res.ok) {
 			await loadPlayers();
 			await loadData();
+			await invalidateAll();
 		}
 	}
 
@@ -268,6 +271,7 @@
 			showDeleteConfirm = null;
 			await loadPlayers();
 			await loadData();
+			await invalidateAll();
 		}
 	}
 
