@@ -602,10 +602,10 @@
 				{#each albums as album}
 					{@const status = syncStatusClass(album.synced_count, album.track_count)}
 					{@const albumId = encodeURIComponent(`${album.artist}:${album.album}`)}
+					{@const artUrl = `/api/library/art/${encodeURIComponent((album.artist || '') + ':' + album.album)}`}
 					<div class="list-row album-row">
 						<a class="row-main" href="/library/album/{albumId}">
 							<span class="sync-dot {status}"></span>
-							{@const artUrl = `/api/library/art/${encodeURIComponent((album.artist || '') + ':' + album.album)}`}
 							<div class="album-art-sm" style="background: {albumGradient(album.album)}">
 								<img
 									src={artUrl}

@@ -180,8 +180,8 @@
 			<div class="spinner"></div>
 		</div>
 	{:else}
+		{@const artUrl = `/api/library/art/${encodeURIComponent(artistName + ':' + albumName)}`}
 		<header class="album-header">
-			{@const artUrl = `/api/library/art/${encodeURIComponent(artistName + ':' + albumName)}`}
 			<div class="album-art-large" style="background: {albumGradient(albumName || '?')}">
 				<span>{albumName?.charAt(0) || '?'}</span>
 				<img
