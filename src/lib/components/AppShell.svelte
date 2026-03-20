@@ -177,7 +177,6 @@
 		position: sticky;
 		top: 0;
 		height: 100dvh;
-		overflow-y: auto;
 		z-index: 10;
 	}
 
