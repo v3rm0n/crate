@@ -104,6 +104,7 @@
 	let playerSelectedIds = $state<Set<number>>(new Set());
 	let removing = $derived(getActiveJobs().some(j => j.type === 'remove' && j.status === 'running'));
 	let orphans = $state<{ id: number; relative_path: string; file_size: number }[]>([]);
+	let showOrphansOnly = $state(false);
 	let showDeleteAllConfirm = $state(false);
 	let deleteConfirmText = $state('');
 	let removingAll = $derived(getActiveJobs().some(j => j.type === 'remove' && j.status === 'running'));
@@ -216,6 +217,7 @@
 			limit: '100'
 		});
 		if (searchQuery) params.set('q', searchQuery);
+		if (showOrphansOnly) params.set('orphans', '1');
 
 		const [tracksRes, orphansRes] = await Promise.all([
 			fetch(`/api/player/tracks?${params}`),
@@ -454,6 +456,30 @@
 	}
 
 	let deleteConfirmValid = $derived(deleteConfirmText === 'DELETE ALL');
+
+	async function removeOrphans() {
+		if (orphans.length === 0) return;
+		const trackIds = orphans.map(o => o.id);
+		try {
+			const res = await fetch('/api/sync/remove', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ trackIds })
+			});
+			const data = await res.json();
+			if (data.jobId) {
+				addToast('success', `Removing ${data.total} orphaned files...`);
+				trackJob(data.jobId, 'remove', `${data.total} orphans`);
+				onJobComplete(data.jobId, () => { loadPlayerData(); loadStats(); });
+			}
+		} catch { addToast('error', 'Remove orphans failed'); }
+	}
+
+	function toggleOrphansFilter() {
+		showOrphansOnly = !showOrphansOnly;
+		playerPage = 1;
+		loadPlayerData();
+	}
 
 	// --- Init: react to URL changes (initial load + sidebar navigation) ---
 
@@ -768,13 +794,23 @@
 
 		{#if orphans.length > 0}
 			<div class="orphan-warning">
-				<strong>{orphans.length} orphaned files</strong> on player not found in library.
+				<div class="orphan-warning-text">
+					<strong>{orphans.length} orphaned file{orphans.length === 1 ? '' : 's'}</strong> on player not found in library.
+				</div>
+				<div class="orphan-actions">
+					<button class="btn-orphan-filter" class:active={showOrphansOnly} onclick={toggleOrphansFilter}>
+						{showOrphansOnly ? 'Show all' : 'Show orphans'}
+					</button>
+					<button class="btn-orphan-delete" onclick={removeOrphans} disabled={removing}>
+						{removing ? 'Removing...' : 'Delete orphans'}
+					</button>
+				</div>
 			</div>
 		{/if}
 
 		<section class="section">
 			<div class="list-header">
-				<h2 class="section-title">{playerTotal} tracks on player</h2>
+				<h2 class="section-title">{playerTotal} {showOrphansOnly ? 'orphaned files' : 'tracks on player'}</h2>
 				{#if playerSelectedIds.size > 0}
 					<div class="selection-actions">
 						<button class="btn-remove-sm" onclick={removeSelectedPlayer} disabled={removing}>
@@ -1190,8 +1226,14 @@
 	.storage-bar-lg { height: 6px; background: var(--color-surface-raised); border-radius: 3px; overflow: hidden; margin-bottom: 0.75rem; }
 	.storage-fill-lg { height: 100%; background: var(--color-accent); border-radius: 3px; transition: width 0.3s ease; }
 	.storage-stats { display: flex; gap: 1.5rem; font-size: 0.8125rem; color: var(--color-text-muted); }
-	.orphan-warning { background: var(--color-accent-soft); border: 1px solid var(--color-accent-muted); border-radius: var(--radius-md); padding: 0.75rem 1rem; font-size: 0.8125rem; color: var(--color-text-muted); margin-bottom: 1.5rem; }
+	.orphan-warning { background: var(--color-accent-soft); border: 1px solid var(--color-accent-muted); border-radius: var(--radius-md); padding: 0.75rem 1rem; font-size: 0.8125rem; color: var(--color-text-muted); margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
 	.orphan-warning strong { color: var(--color-accent); }
+	.orphan-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+	.btn-orphan-filter { padding: 0.3125rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--color-accent-muted); background: transparent; color: var(--color-accent); font-size: 0.75rem; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+	.btn-orphan-filter:hover, .btn-orphan-filter.active { background: var(--color-accent); color: #0e0d0b; }
+	.btn-orphan-delete { padding: 0.3125rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--color-danger, #e55); background: transparent; color: var(--color-danger, #e55); font-size: 0.75rem; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+	.btn-orphan-delete:hover:not(:disabled) { background: var(--color-danger, #e55); color: #fff; }
+	.btn-orphan-delete:disabled { opacity: 0.5; cursor: not-allowed; }
 	.orphan-tag { font-size: 0.625rem; font-weight: 600; text-transform: uppercase; color: var(--color-partial); background: rgba(196, 154, 60, 0.12); padding: 0.0625rem 0.375rem; border-radius: 2px; margin-left: 0.375rem; }
 	.btn-delete-all { padding: 0.25rem 0.625rem; border-radius: var(--radius-sm); border: 1px solid var(--color-danger); background: transparent; color: var(--color-danger); font-size: 0.75rem; cursor: pointer; font-family: inherit; transition: background 0.15s; }
 	.btn-delete-all:hover { background: rgba(191, 69, 69, 0.1); }

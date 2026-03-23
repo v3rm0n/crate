@@ -8,6 +8,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	const limit = parseInt(url.searchParams.get('limit') || '100');
 	const offset = (page - 1) * limit;
 	const search = url.searchParams.get('q');
+	const orphansOnly = url.searchParams.get('orphans') === '1';
 	const playerIdParam = url.searchParams.get('player_id');
 
 	// Get player ID from query param or fallback to active player
@@ -19,6 +20,10 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	let whereClause = 'WHERE pt.player_id = ?';
 	const params: (string | number)[] = [playerId];
+
+	if (orphansOnly) {
+		whereClause += ' AND pt.is_orphan = 1';
+	}
 
 	if (search) {
 		whereClause += ' AND (pt.relative_path LIKE ? OR lt.title LIKE ? OR lt.artist LIKE ? OR lt.album LIKE ?)';
