@@ -481,6 +481,22 @@
 		loadStats();
 		loadCurrentView();
 	});
+
+	// Reload data when the active player changes (e.g. via sidebar selector)
+	let _prevPlayerId: number | undefined;
+
+	$effect(() => {
+		const activePlayerId = (page.data as { activePlayer?: { id: number } | null })?.activePlayer?.id;
+		if (_prevPlayerId === undefined) {
+			_prevPlayerId = activePlayerId;
+			return;
+		}
+		if (activePlayerId !== _prevPlayerId) {
+			_prevPlayerId = activePlayerId;
+			loadStats();
+			loadCurrentView();
+		}
+	});
 </script>
 
 <div class="music-page">

@@ -526,7 +526,7 @@
 			{:else}
 				<div class="player-list">
 					{#each playersData.players as player}
-						<div class="player-card" class:active={player.is_active}>
+						<div class="player-card" class:active={player.is_active} class:disconnected={!player.is_mounted}>
 							<div class="player-info">
 								<div class="player-header">
 									<span class="player-name">
@@ -544,6 +544,7 @@
 									<span class="path-separator">→</span>
 									<code class="path-value">{player.managed_dir}</code>
 								</div>
+								{#if player.is_mounted}
 								<div class="player-stats">
 									<span class="stat">
 										<strong>{player.track_count}</strong> tracks
@@ -553,9 +554,10 @@
 										<strong>{formatBytes(player.total_size)}</strong>
 									</span>
 								</div>
+							{/if}
 							</div>
 							<div class="player-actions">
-								{#if !player.is_active}
+								{#if !player.is_active && player.is_mounted}
 									<button
 										class="btn-action-small"
 										onclick={() => activatePlayer(player.id)}
@@ -1217,6 +1219,12 @@
 	.player-card.active {
 		border-color: var(--color-accent-muted);
 		background: var(--color-accent-soft);
+	}
+
+	.player-card.disconnected {
+		opacity: 0.6;
+		border-color: var(--color-border-subtle);
+		border-style: dashed;
 	}
 
 	.player-info {
