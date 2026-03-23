@@ -12,6 +12,7 @@ import {
 	listPlayerDirectories,
 	type PlayerWithStats
 } from '$lib/server/players.js';
+import { scanPlayer } from '$lib/server/player.js';
 import { createLogger } from '$lib/server/logger.js';
 import type { RequestHandler } from './$types.js';
 
@@ -53,6 +54,12 @@ export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const player = createPlayer(name, mountPath, managedDir || '');
 		log.info('Created player via API', { playerId: player.id, name, mountPath });
+
+		// Auto-scan the new player in the background
+		scanPlayer(player.id).catch(err => {
+			log.error('Auto-scan failed for new player', { playerId: player.id, error: err instanceof Error ? err.message : String(err) });
+		});
+
 		return json({ success: true, player });
 	} catch (err) {
 		const errorMsg = err instanceof Error ? err.message : 'Unknown error';

@@ -62,7 +62,7 @@ services:
       # For single player mode (legacy):
       # - /path/to/your/player:/player
       # For multi-player mode (recommended for Unraid):
-      - /mnt/disks:/mnt/disks
+      - /mnt/disks:/mnt/disks:slave
     environment:
       # For multi-player mode:
       - PLAYER_MOUNT_BASE=/mnt/disks
@@ -88,7 +88,7 @@ docker run -d \
   -p 3000:3000 \
   -v crate-data:/data \
   -v /path/to/your/music/library:/library:ro \
-  -v /mnt/disks:/mnt/disks \
+  -v /mnt/disks:/mnt/disks:slave \
   -e PLAYER_MOUNT_BASE=/mnt/disks \
   ghcr.io/v3rm0n/crate:latest
 ```
@@ -118,6 +118,8 @@ When using multiple players, the player mount base should be a parent directory 
 - `/mnt/disks/Sony_WM1A` — your Sony Walkman
 
 Set `PLAYER_MOUNT_BASE=/mnt/disks` and Crate will discover all three as separate manageable players.
+
+**Important:** Use the `:slave` mount propagation flag (e.g., `/mnt/disks:/mnt/disks:slave`) so that host-side mount/unmount events (plugging or unplugging a player) are visible inside the container. Without this, the container keeps a stale copy of the mount and cannot detect disconnected players.
 
 ### Supported formats
 

@@ -121,8 +121,30 @@ export async function scanPlayer(
 			const relativePath = path.relative(managedPath, filePath);
 			const stat = fs.statSync(filePath);
 
-			// Try to match with library by relative path
-			const libraryTrack = findLibraryTrack.get(relativePath) as { id: number } | undefined;
+			// Try to match with library by relative path.
+			// FAT32 filesystems may return filenames in a different Unicode form
+			// than the library (e.g., NFD vs NFC, or UTF-8 bytes misread as Latin-1).
+			// Try multiple matching strategies before marking as orphan.
+			let libraryTrack = findLibraryTrack.get(relativePath) as { id: number } | undefined;
+
+			if (!libraryTrack) {
+				// Try NFC-normalized path (handles NFD from FAT32/macOS)
+				const nfcPath = relativePath.normalize('NFC');
+				if (nfcPath !== relativePath) {
+					libraryTrack = findLibraryTrack.get(nfcPath) as { id: number } | undefined;
+				}
+			}
+
+			if (!libraryTrack) {
+				// Try fixing UTF-8 mojibake (UTF-8 bytes misinterpreted as Latin-1)
+				try {
+					const buf = Buffer.from(relativePath, 'latin1');
+					const decoded = buf.toString('utf8');
+					if (decoded !== relativePath && !decoded.includes('\ufffd')) {
+						libraryTrack = findLibraryTrack.get(decoded.normalize('NFC')) as { id: number } | undefined;
+					}
+				} catch { /* ignore decode errors */ }
+			}
 
 			insertStmt.run(
 				playerId,
