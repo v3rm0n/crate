@@ -364,12 +364,15 @@
 
 	@media (max-width: 768px) {
 		.dropdown {
-			position: fixed;
-			top: auto;
-			bottom: calc(env(safe-area-inset-bottom, 0px) + 60px);
-			left: 0.75rem;
-			right: 0.75rem;
-			min-width: unset;
+			position: absolute;
+			top: calc(100% + 0.375rem);
+			left: 0;
+			right: 0;
+			min-width: 240px;
+		}
+
+		.player-name {
+			max-width: none;
 		}
 	}
 </style>

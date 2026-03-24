@@ -500,6 +500,7 @@
 			align-items: center;
 			justify-content: space-between;
 			padding: 0.625rem 1rem;
+			padding-top: calc(env(safe-area-inset-top, 0px) + 0.625rem);
 			background: var(--color-surface);
 			border-bottom: 1px solid var(--color-border-subtle);
 			position: sticky;
@@ -530,6 +531,8 @@
 			border-top: 1px solid var(--color-border-subtle);
 			z-index: 20;
 			padding-bottom: env(safe-area-inset-bottom, 0px);
+			padding-left: env(safe-area-inset-left, 0px);
+			padding-right: env(safe-area-inset-right, 0px);
 		}
 
 		.tab-item {
@@ -538,7 +541,7 @@
 			flex-direction: column;
 			align-items: center;
 			gap: 0.25rem;
-			padding: 0.5rem 0;
+			padding: 0.625rem 0 0.375rem;
 			text-decoration: none;
 			color: var(--color-text-faint);
 			font-size: 0.625rem;
@@ -561,7 +564,7 @@
 		}
 
 		.main-content {
-			padding: 1.25rem 1rem;
+			padding: 1.25rem calc(env(safe-area-inset-right, 0px) + 1rem) 1.25rem calc(env(safe-area-inset-left, 0px) + 1rem);
 		}
 	}
 </style>
