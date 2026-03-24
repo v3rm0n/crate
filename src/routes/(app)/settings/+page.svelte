@@ -536,7 +536,7 @@
 							<div class="player-info">
 								<div class="player-header">
 									<span class="player-name">
-										{player.name}
+										{player.alias || player.name}
 										{#if player.is_active}
 											<span class="active-badge">Active</span>
 										{/if}
@@ -546,13 +546,9 @@
 									</span>
 								</div>
 								<div class="player-paths">
-								{#if player.alias}
-									<span class="alias-value">{player.alias}</span>
-								{:else}
 									<code class="path-value">{player.mount_path}</code>
 									<span class="path-separator">→</span>
 									<code class="path-value">{player.managed_dir}</code>
-								{/if}
 								</div>
 								{#if player.is_mounted}
 								<div class="player-stats">
@@ -1312,10 +1308,6 @@
 		color: var(--color-text-faint);
 	}
 
-	.alias-value {
-		font-size: 0.8125rem;
-		color: var(--color-text-muted);
-	}
 
 	.player-stats {
 		display: flex;

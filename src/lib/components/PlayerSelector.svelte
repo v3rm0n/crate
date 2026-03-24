@@ -58,7 +58,7 @@
 			<div class="player-info">
 				<span class="player-name">
 					{#if !activePlayer.is_mounted}<span class="disconnected-dot"></span>{/if}
-					{activePlayer.name}
+					{activePlayer.alias || activePlayer.name}
 				</span>
 				<span class="player-stats">
 					{#if activePlayer.is_mounted}
@@ -102,7 +102,7 @@
 							<div class="option-info">
 								<span class="option-name">
 									{#if !player.is_mounted}<span class="disconnected-dot"></span>{/if}
-									{player.name}
+									{player.alias || player.name}
 								</span>
 								<span class="option-stats">
 									{#if player.is_mounted}
