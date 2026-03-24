@@ -9,6 +9,7 @@ const log = createLogger('players');
 export interface Player {
 	id: number;
 	name: string;
+	alias: string;
 	mount_path: string;
 	managed_dir: string;
 	is_active: number;
@@ -175,13 +176,16 @@ export function createPlayer(
  */
 export function updatePlayer(
 	id: number,
-	updates: Partial<Pick<Player, 'name' | 'managed_dir'>>
+	updates: Partial<Pick<Player, 'name' | 'alias' | 'managed_dir'>>
 ): Player | undefined {
 	const player = getPlayer(id);
 	if (!player) return undefined;
 
 	if (updates.name !== undefined) {
 		db.prepare('UPDATE players SET name = ? WHERE id = ?').run(updates.name, id);
+	}
+	if (updates.alias !== undefined) {
+		db.prepare('UPDATE players SET alias = ? WHERE id = ?').run(updates.alias, id);
 	}
 	if (updates.managed_dir !== undefined) {
 		db.prepare('UPDATE players SET managed_dir = ? WHERE id = ?').run(updates.managed_dir, id);

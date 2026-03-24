@@ -112,6 +112,15 @@ function migrate(db: Database.Database): void {
 		CREATE INDEX IF NOT EXISTS idx_players_is_active ON players(is_active);
 	`);
 
+	// Add alias column to players table if missing
+	const hasAliasColumn = db.prepare(`
+		SELECT 1 FROM pragma_table_info('players') WHERE name = 'alias'
+	`).get();
+	if (!hasAliasColumn) {
+		db.exec("ALTER TABLE players ADD COLUMN alias TEXT NOT NULL DEFAULT ''");
+		log.info('Added alias column to players table');
+	}
+
 	// Run data migrations
 	migrateData(db);
 }

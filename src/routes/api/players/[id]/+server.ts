@@ -46,9 +46,10 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 	}
 
 	// Handle update
-	const { name, managed_dir } = body;
-	const updates: Partial<{ name: string; managed_dir: string }> = {};
+	const { name, alias, managed_dir } = body;
+	const updates: Partial<{ name: string; alias: string; managed_dir: string }> = {};
 	if (name !== undefined) updates.name = name;
+	if (alias !== undefined) updates.alias = alias;
 	if (managed_dir !== undefined) updates.managed_dir = managed_dir;
 
 	const player = updatePlayer(id, updates);

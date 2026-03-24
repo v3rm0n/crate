@@ -13,6 +13,7 @@
 	interface Player {
 		id: number;
 		name: string;
+		alias: string;
 		mount_path: string;
 		managed_dir: string;
 		is_active: number;

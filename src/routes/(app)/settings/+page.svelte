@@ -34,6 +34,7 @@
 	interface Player {
 		id: number;
 		name: string;
+		alias: string;
 		mount_path: string;
 		managed_dir: string;
 		track_count: number;
@@ -69,6 +70,7 @@
 	let selectedDevice: DiscoveredDevice | null = $state(null);
 	let managedDirInput = $state('');
 	let playerNameInput = $state('');
+	let playerAliasInput = $state('');
 	let availableDirectories = $state<{ name: string; path: string }[]>([]);
 	let loadingDirectories = $state(false);
 	let savingPlayer = $state(false);
@@ -238,6 +240,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					name: playerNameInput,
+					alias: playerAliasInput,
 					managed_dir: managedDirInput
 				})
 			});
@@ -282,6 +285,7 @@
 		selectedDevice = null;
 		managedDirInput = '';
 		playerNameInput = '';
+		playerAliasInput = '';
 		newDirInput = '';
 		availableDirectories = [];
 		if (playersData?.mountBase) {
@@ -295,6 +299,7 @@
 	function openEditPlayerModal(player: Player) {
 		editingPlayer = player;
 		playerNameInput = player.name;
+		playerAliasInput = player.alias || '';
 		managedDirInput = player.managed_dir;
 		addPlayerStep = 4;
 		showAddPlayerModal = true;
@@ -307,6 +312,7 @@
 		selectedDevice = null;
 		managedDirInput = '';
 		playerNameInput = '';
+		playerAliasInput = '';
 		newDirInput = '';
 		availableDirectories = [];
 	}
@@ -540,9 +546,13 @@
 									</span>
 								</div>
 								<div class="player-paths">
+								{#if player.alias}
+									<span class="alias-value">{player.alias}</span>
+								{:else}
 									<code class="path-value">{player.mount_path}</code>
 									<span class="path-separator">→</span>
 									<code class="path-value">{player.managed_dir}</code>
+								{/if}
 								</div>
 								{#if player.is_mounted}
 								<div class="player-stats">
@@ -614,6 +624,17 @@
 							bind:value={playerNameInput}
 							placeholder="My iPod"
 						/>
+					</div>
+					<div class="form-group">
+						<label>Alias</label>
+						<input
+							type="text"
+							bind:value={playerAliasInput}
+							placeholder="e.g. iPod Classic 7th Gen"
+						/>
+						<p class="form-hint">
+							Shown instead of mount path in the UI. Leave empty to show the path.
+						</p>
 					</div>
 					<div class="form-group">
 						<label>Managed directory</label>
@@ -1289,6 +1310,11 @@
 
 	.path-separator {
 		color: var(--color-text-faint);
+	}
+
+	.alias-value {
+		font-size: 0.8125rem;
+		color: var(--color-text-muted);
 	}
 
 	.player-stats {
