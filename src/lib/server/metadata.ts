@@ -19,6 +19,7 @@ export interface TrackMetadata {
 	format: string;
 	bitrate: number | null;
 	sampleRate: number | null;
+	mbArtistId: string | null;
 }
 
 export function isSupportedAudioFile(filePath: string): boolean {
@@ -63,6 +64,11 @@ export async function extractMetadata(filePath: string): Promise<TrackMetadata |
 		const metadata = await parseFile(filePath, { skipCovers: true });
 		const { common, format } = metadata;
 
+		// Use album artist's MusicBrainz ID if available, otherwise fall back to track artist's
+		const mbArtistId = common.musicbrainz_albumartistid?.[0]
+			|| common.musicbrainz_artistid?.[0]
+			|| null;
+
 		return {
 			title: common.title || null,
 			artist: common.artist || null,
@@ -75,7 +81,8 @@ export async function extractMetadata(filePath: string): Promise<TrackMetadata |
 			duration: format.duration || null,
 			format: getFormatFromExtension(filePath),
 			bitrate: format.bitrate ? Math.round(format.bitrate / 1000) : null,
-			sampleRate: format.sampleRate || null
+			sampleRate: format.sampleRate || null,
+			mbArtistId
 		};
 	} catch (err) {
 		log.warn('Failed to extract metadata from file', {

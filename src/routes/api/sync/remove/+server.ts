@@ -24,9 +24,15 @@ export const POST: RequestHandler = async ({ request }) => {
 		let query = `
 			SELECT pt.id FROM player_tracks pt
 			JOIN library_tracks lt ON lt.id = pt.library_track_id
-			WHERE pt.player_id = ? AND (lt.album_artist = ? OR lt.artist = ?)
+			WHERE pt.player_id = ? AND (
+				lt.album_artist = ? OR lt.artist = ?
+				OR (lt.mb_artist_id IS NOT NULL AND lt.mb_artist_id IN (
+					SELECT mb_artist_id FROM library_tracks
+					WHERE (album_artist = ? OR artist = ?) AND mb_artist_id IS NOT NULL
+				))
+			)
 		`;
-		const params: (string | number)[] = [playerId, artist, artist];
+		const params: (string | number)[] = [playerId, artist, artist, artist, artist];
 
 		if (album) {
 			query += ' AND lt.album = ?';

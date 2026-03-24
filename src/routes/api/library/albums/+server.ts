@@ -26,8 +26,15 @@ export const GET: RequestHandler = async ({ url }) => {
 	let whereClause = 'WHERE 1=1';
 
 	if (artist) {
-		whereClause += ' AND (lt.album_artist = ? OR lt.artist = ?)';
-		params.push(artist, artist);
+		// Match by name OR by MusicBrainz ID (so grouped artists show all their albums)
+		whereClause += ` AND (
+			lt.album_artist = ? OR lt.artist = ?
+			OR (lt.mb_artist_id IS NOT NULL AND lt.mb_artist_id IN (
+				SELECT mb_artist_id FROM library_tracks
+				WHERE (album_artist = ? OR artist = ?) AND mb_artist_id IS NOT NULL
+			))
+		)`;
+		params.push(artist, artist, artist, artist);
 	}
 
 	if (search) {

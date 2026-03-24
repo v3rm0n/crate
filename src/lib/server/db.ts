@@ -112,6 +112,16 @@ function migrate(db: Database.Database): void {
 		CREATE INDEX IF NOT EXISTS idx_players_is_active ON players(is_active);
 	`);
 
+	// Add mb_artist_id column to library_tracks if missing
+	const hasMbArtistId = db.prepare(`
+		SELECT 1 FROM pragma_table_info('library_tracks') WHERE name = 'mb_artist_id'
+	`).get();
+	if (!hasMbArtistId) {
+		db.exec("ALTER TABLE library_tracks ADD COLUMN mb_artist_id TEXT");
+		db.exec("CREATE INDEX IF NOT EXISTS idx_library_tracks_mb_artist_id ON library_tracks(mb_artist_id)");
+		log.info('Added mb_artist_id column to library_tracks table');
+	}
+
 	// Add alias column to players table if missing
 	const hasAliasColumn = db.prepare(`
 		SELECT 1 FROM pragma_table_info('players') WHERE name = 'alias'

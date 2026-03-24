@@ -25,9 +25,20 @@ export const GET: RequestHandler = async ({ url }) => {
 		params.push(`%${search}%`);
 	}
 
+	// Group by MusicBrainz artist ID when available, falling back to artist name.
+	// This merges artists like "DJ Zinc" and "Zinc" that share the same MB ID.
+	// For display name, pick the variant with the most tracks.
 	let query = `
 		SELECT
-			COALESCE(lt.album_artist, lt.artist) as name,
+			-- Pick the name variant with the most tracks in this group
+			(SELECT COALESCE(lt2.album_artist, lt2.artist)
+			 FROM library_tracks lt2
+			 WHERE COALESCE(lt2.mb_artist_id, COALESCE(lt2.album_artist, lt2.artist))
+			       = COALESCE(lt.mb_artist_id, COALESCE(lt.album_artist, lt.artist))
+			 GROUP BY COALESCE(lt2.album_artist, lt2.artist)
+			 ORDER BY COUNT(*) DESC
+			 LIMIT 1
+			) as name,
 			COUNT(DISTINCT lt.album) as album_count,
 			COUNT(lt.id) as track_count,
 			COUNT(pt.id) as synced_count,
@@ -35,7 +46,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		FROM library_tracks lt
 		${playerJoin}
 		${whereClause}
-		GROUP BY COALESCE(lt.album_artist, lt.artist)
+		GROUP BY COALESCE(lt.mb_artist_id, COALESCE(lt.album_artist, lt.artist))
 	`;
 
 	if (syncFilter === 'synced') {

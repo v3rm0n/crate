@@ -103,8 +103,8 @@ export async function scanLibrary(onProgress?: ProgressCallback): Promise<void> 
 		const seenPaths = new Set<string>();
 
 		const insertStmt = db.prepare(`
-			INSERT INTO library_tracks (relative_path, title, artist, album, album_artist, genre, track_number, disc_number, year, duration, format, bitrate, sample_rate, file_size, last_modified, scanned_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+			INSERT INTO library_tracks (relative_path, title, artist, album, album_artist, genre, track_number, disc_number, year, duration, format, bitrate, sample_rate, file_size, last_modified, mb_artist_id, scanned_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
 			ON CONFLICT(relative_path) DO UPDATE SET
 				title = excluded.title,
 				artist = excluded.artist,
@@ -120,6 +120,7 @@ export async function scanLibrary(onProgress?: ProgressCallback): Promise<void> 
 				sample_rate = excluded.sample_rate,
 				file_size = excluded.file_size,
 				last_modified = excluded.last_modified,
+				mb_artist_id = excluded.mb_artist_id,
 				scanned_at = datetime('now')
 		`);
 
@@ -173,7 +174,8 @@ export async function scanLibrary(onProgress?: ProgressCallback): Promise<void> 
 					metadata.bitrate,
 					metadata.sampleRate,
 					stat.size,
-					mtime
+					mtime,
+					metadata.mbArtistId
 				);
 				insertedCount++;
 
