@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { slide } from 'svelte/transition';
 	import { addToast } from '$lib/stores/toast.svelte.js';
 	import { trackJob, onJobComplete, getActiveJobs } from '$lib/stores/sync.svelte.js';
@@ -278,7 +278,7 @@
 			if (data.jobId) {
 				addToast('success', `Syncing ${data.total} tracks from ${artistName}...`);
 				trackJob(data.jobId, 'copy', artistName);
-				onJobComplete(data.jobId, () => { loadArtists(); loadStats(); });
+				onJobComplete(data.jobId, () => { loadArtists(); loadStats(); invalidateAll(); });
 			} else {
 				addToast('success', `${artistName} is already fully synced`);
 			}
@@ -296,7 +296,7 @@
 			if (data.jobId) {
 				addToast('success', `Removing tracks by ${artistName}...`);
 				trackJob(data.jobId, 'remove', artistName);
-				onJobComplete(data.jobId, () => { loadArtists(); loadStats(); });
+				onJobComplete(data.jobId, () => { loadArtists(); loadStats(); invalidateAll(); });
 			} else {
 				addToast('success', `No tracks to remove for ${artistName}`);
 			}
@@ -323,7 +323,7 @@
 			if (data.jobId) {
 				addToast('success', `Syncing ${data.total} tracks from "${albumName}"...`);
 				trackJob(data.jobId, 'copy', albumName);
-				onJobComplete(data.jobId, () => { loadAlbums(); loadStats(); });
+				onJobComplete(data.jobId, () => { loadAlbums(); loadStats(); invalidateAll(); });
 			} else {
 				addToast('success', `"${albumName}" is already fully synced`);
 			}
@@ -341,7 +341,7 @@
 			if (data.jobId) {
 				addToast('success', `Removing tracks from "${albumName}"...`);
 				trackJob(data.jobId, 'remove', albumName);
-				onJobComplete(data.jobId, () => { loadAlbums(); loadStats(); });
+				onJobComplete(data.jobId, () => { loadAlbums(); loadStats(); invalidateAll(); });
 			} else {
 				addToast('success', `No tracks to remove from "${albumName}"`);
 			}
@@ -402,7 +402,7 @@
 			if (data.jobId) {
 				addToast('success', `Syncing ${data.total} track${data.total > 1 ? 's' : ''}...`);
 				trackJob(data.jobId, 'copy', `${data.total} tracks`);
-				onJobComplete(data.jobId, () => { loadTracks(); loadStats(); });
+				onJobComplete(data.jobId, () => { loadTracks(); loadStats(); invalidateAll(); });
 			}
 		} catch { addToast('error', 'Sync failed'); }
 		selectedIds = new Set();
@@ -429,7 +429,7 @@
 			if (data.jobId) {
 				addToast('success', `Removing ${data.total} tracks...`);
 				trackJob(data.jobId, 'remove', `${data.total} tracks`);
-				onJobComplete(data.jobId, () => { loadPlayerData(); loadStats(); });
+				onJobComplete(data.jobId, () => { loadPlayerData(); loadStats(); invalidateAll(); });
 			}
 		} catch { addToast('error', 'Remove failed'); }
 		playerSelectedIds = new Set();
@@ -446,7 +446,7 @@
 			if (data.jobId) {
 				addToast('success', `Removing all ${data.total} tracks...`);
 				trackJob(data.jobId, 'remove', `All ${data.total} tracks`);
-				onJobComplete(data.jobId, () => { loadPlayerData(); loadStats(); });
+				onJobComplete(data.jobId, () => { loadPlayerData(); loadStats(); invalidateAll(); });
 			} else {
 				addToast('success', 'No tracks to remove');
 			}
@@ -470,7 +470,7 @@
 			if (data.jobId) {
 				addToast('success', `Removing ${data.total} orphaned files...`);
 				trackJob(data.jobId, 'remove', `${data.total} orphans`);
-				onJobComplete(data.jobId, () => { loadPlayerData(); loadStats(); });
+				onJobComplete(data.jobId, () => { loadPlayerData(); loadStats(); invalidateAll(); });
 			}
 		} catch { addToast('error', 'Remove orphans failed'); }
 	}

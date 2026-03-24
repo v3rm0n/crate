@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
+	import { invalidateAll } from '$app/navigation';
 	import { addToast } from '$lib/stores/toast.svelte.js';
 	import { trackJob, onJobComplete, getActiveJobs } from '$lib/stores/sync.svelte.js';
 
@@ -97,7 +98,7 @@
 			if (data.jobId) {
 				addToast('success', `Syncing ${data.total} track${data.total > 1 ? 's' : ''}...`);
 				trackJob(data.jobId, 'copy', albumName);
-				onJobComplete(data.jobId, () => loadTracks());
+				onJobComplete(data.jobId, () => { loadTracks(); invalidateAll(); });
 			}
 		} catch {
 			addToast('error', 'Sync request failed', 'Could not connect to the server');
@@ -118,7 +119,7 @@
 			if (data.jobId) {
 				addToast('success', `Syncing ${data.total} track${data.total > 1 ? 's' : ''}...`);
 				trackJob(data.jobId, 'copy', albumName);
-				onJobComplete(data.jobId, () => loadTracks());
+				onJobComplete(data.jobId, () => { loadTracks(); invalidateAll(); });
 			}
 		} catch {
 			addToast('error', 'Sync request failed', 'Could not connect to the server');
@@ -137,7 +138,7 @@
 			if (data.jobId) {
 				addToast('success', `Removing tracks from "${albumName}"...`);
 				trackJob(data.jobId, 'remove', albumName);
-				onJobComplete(data.jobId, () => loadTracks());
+				onJobComplete(data.jobId, () => { loadTracks(); invalidateAll(); });
 			}
 		} catch {
 			addToast('error', 'Remove request failed', 'Could not connect to the server');
